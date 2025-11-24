@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Next.js 应用服务
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextjs-jwt-app
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=nextjs_user
+      - DB_PASSWORD=nextjs_password
+      - DB_NAME=nextjs_jwt
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nextjs-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3011/api/auth/me', (r) => {process.exit(r.statusCode === 401 || r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: nextjs-jwt-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=nextjs_jwt
+      - MYSQL_USER=nextjs_user
+      - MYSQL_PASSWORD=nextjs_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    restart: unless-stopped
+    networks:
+      - nextjs-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # (可选) phpMyAdmin - 数据库管理工具
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: nextjs-jwt-phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=root
+      - PMA_PASSWORD=root_password
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - nextjs-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  nextjs-network:
+    driver: bridge
+

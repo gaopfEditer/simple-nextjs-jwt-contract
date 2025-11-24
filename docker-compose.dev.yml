@@ -1,0 +1,70 @@
+version: '3.8'
+
+# 开发环境配置
+# 使用方法: docker-compose -f docker-compose.dev.yml up
+
+services:
+  # Next.js 应用服务（开发模式）
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # 使用 builder 阶段，保留开发工具
+    container_name: nextjs-jwt-app-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=nextjs_user
+      - DB_PASSWORD=nextjs_password
+      - DB_NAME=nextjs_jwt
+      - JWT_SECRET=dev-secret-key
+      - JWT_EXPIRES_IN=7d
+    volumes:
+      # 挂载源代码，支持热重载
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nextjs-network
+    command: pnpm dev
+
+  # MySQL 数据库服务（与生产环境相同）
+  mysql:
+    image: mysql:8.0
+    container_name: nextjs-jwt-mysql-dev
+    ports:
+      - "3307:3306"  # 使用不同端口避免冲突
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=nextjs_jwt
+      - MYSQL_USER=nextjs_user
+      - MYSQL_PASSWORD=nextjs_password
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    restart: unless-stopped
+    networks:
+      - nextjs-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql_dev_data:
+    driver: local
+
+networks:
+  nextjs-network:
+    driver: bridge
+

@@ -1,0 +1,245 @@
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.nav {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px 0;
+}
+
+.navContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  text-decoration: none;
+}
+
+.logo:hover {
+  color: #0070f3;
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.card {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 1000px;
+  margin: 0 auto 2rem auto;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #333;
+  text-align: center;
+}
+
+.userInfo {
+  margin-bottom: 2rem;
+}
+
+.infoItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.infoItem:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 600;
+  color: #666;
+}
+
+.value {
+  color: #333;
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 1.25rem;
+  color: #666;
+}
+
+/* 标签页样式 */
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #eee;
+}
+
+.tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: #0070f3;
+}
+
+.tab.active {
+  color: #0070f3;
+  border-bottom-color: #0070f3;
+}
+
+/* 列表容器 */
+.listContainer {
+  margin-top: 2rem;
+}
+
+.listHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.listHeader h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pageInfo {
+  color: #666;
+  font-size: 14px;
+}
+
+/* 列表样式 */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.listItem {
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.2s;
+}
+
+.listItem:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #0070f3;
+}
+
+.listItemHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.listItemId {
+  font-weight: 600;
+  color: #0070f3;
+}
+
+.listItemCode {
+  color: #666;
+  font-size: 14px;
+}
+
+.listItemContent {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.listItemContent p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.listItemContent strong {
+  color: #666;
+  margin-right: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+  font-size: 16px;
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 30px 20px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .infoItem {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .listHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagination {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .listItemContent {
+    grid-template-columns: 1fr;
+  }
+}
+
