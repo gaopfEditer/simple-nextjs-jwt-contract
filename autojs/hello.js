@@ -2,8 +2,8 @@ auto.waitFor();
 
 // WebSocket 配置
 const WS_HOST = "192.168.2.218";
-const WS_PORT = 8080; // 可根据实际情况修改端口
-const WS_URL = "ws://" + WS_HOST + ":" + WS_PORT;
+const WS_PORT = 3000; // 根据服务器实际端口修改（默认 3000）
+const WS_URL = "ws://" + WS_HOST + ":" + WS_PORT + "/api/ws";
 
 // 买卖合约标准数据格式示例
 const EXAMPLE_BUY_ORDER = {
@@ -30,6 +30,7 @@ const EXAMPLE_SELL_ORDER = {
 
 let ws = null;
 let isConnected = false;
+let httpPushUrl = null; // HTTP 模式下的推送地址
 
 // 初始化 WebSocket 连接
 function initWebSocket() {
@@ -94,43 +95,55 @@ function initWebSocket() {
 
 // HTTP 轮询备选方案（如果 WebSocket 不可用）
 let pollingInterval = null;
+let httpClientId = null; // 存储 HTTP 客户端的 ID
+
 function startHttpPolling() {
     const POLL_URL = "http://" + WS_HOST + ":" + WS_PORT + "/poll";
     const PUSH_URL = "http://" + WS_HOST + ":" + WS_PORT + "/push";
     
     isConnected = true;
+    httpPushUrl = PUSH_URL; // 保存推送地址，供 sendMessage 使用
     
-    // 发送消息函数
-    window.sendMessage = function(data) {
-        try {
-            let response = http.postJson(PUSH_URL, data);
-            console.log("HTTP 发送消息成功");
-        } catch (e) {
-            console.log("发送消息失败: " + e);
-        }
-    };
-    
-    // 发送连接确认
-    sendMessage({
-        "type": "connected",
-        "message": "AutoJS 客户端已连接（HTTP 模式）"
-    });
-    
-    // 轮询接收消息
+    // 轮询接收消息（首次轮询会获取客户端 ID）
     pollingInterval = setInterval(function() {
         try {
-            let response = http.get(POLL_URL);
+            let pollUrl = POLL_URL;
+            if (httpClientId) {
+                pollUrl += "?clientId=" + httpClientId;
+            }
+            
+            let response = http.get(pollUrl);
             if (response && response.statusCode === 200 && response.body) {
                 let bodyStr = response.body.string();
                 if (bodyStr && bodyStr !== "null" && bodyStr !== "") {
                     let message = JSON.parse(bodyStr);
-                    if (message && message.action) {
+                    
+                    // 如果是欢迎消息，保存客户端 ID（首次连接）
+                    if (message.type === "welcome" && message.clientId && !httpClientId) {
+                        httpClientId = message.clientId;
+                        console.log("已获取客户端 ID: " + httpClientId);
+                        toast("已连接，客户端 ID: " + httpClientId);
+                        
+                        // 发送连接确认
+                        sendMessage({
+                            "type": "connected",
+                            "clientId": httpClientId,
+                            "message": "AutoJS 客户端已连接（HTTP 模式）"
+                        });
+                    }
+                    
+                    // 处理订单消息
+                    if (message.type === "order_forwarded" && message.order) {
+                        handleMessage(JSON.stringify(message.order));
+                    } else if (message.action && (message.action === "buy" || message.action === "sell")) {
+                        // 直接是订单数据
                         handleMessage(JSON.stringify(message));
                     }
                 }
             }
         } catch (e) {
             // 忽略轮询错误（连接失败等）
+            console.log("轮询错误: " + e);
         }
     }, 1000);
     
@@ -150,11 +163,23 @@ function sendMessage(data) {
     try {
         let message = JSON.stringify(data);
         if (ws && isConnected) {
+            // WebSocket 模式
             ws.send(message);
-        } else if (window.sendMessage) {
-            window.sendMessage(data);
+            console.log("发送消息 (WebSocket): " + message);
+        } else if (httpPushUrl) {
+            // HTTP 模式，添加 clientId
+            if (httpClientId && !data.clientId) {
+                data.clientId = httpClientId;
+            }
+            try {
+                let response = http.postJson(httpPushUrl, data);
+                console.log("发送消息 (HTTP): " + message);
+            } catch (e) {
+                console.log("HTTP 发送消息失败: " + e);
+            }
+        } else {
+            console.log("未找到可用的发送方式");
         }
-        console.log("发送消息: " + message);
     } catch (e) {
         console.log("发送消息失败: " + e);
     }
