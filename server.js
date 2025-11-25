@@ -25,7 +25,7 @@ app.prepare().then(() => {
         req.on('end', () => {
           try {
             const data = JSON.parse(body);
-            handleHttpPush(data, res);
+            handleHttpPush(data, req, res);
           } catch (e) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Invalid JSON' }));
@@ -37,6 +37,8 @@ app.prepare().then(() => {
       // 处理 HTTP 轮询接口（用于 AutoJS 等客户端接收消息）
       if (pathname === '/poll' && req.method === 'GET') {
         const clientId = parsedUrl.query.clientId;
+        const clientIp = req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
         
         if (!clientId) {
           // 新客户端，分配 ID（只在首次连接时创建）
@@ -45,7 +47,11 @@ app.prepare().then(() => {
             id: newClientId,
             boundTo: null,
             messageQueue: [],
-            lastPollTime: Date.now()
+            lastPollTime: Date.now(),
+            ip: clientIp,
+            userAgent: userAgent,
+            createdAt: new Date().toISOString(),
+            deviceInfo: null
           });
           
           // 直接返回欢迎消息（不放入队列，立即返回）
@@ -56,7 +62,7 @@ app.prepare().then(() => {
             message: '欢迎连接到 WebSocket 服务器！',
             timestamp: new Date().toISOString()
           }));
-        //   console.log(`新的 HTTP 客户端已连接: ${newClientId}`);
+          // console.log(`[新 HTTP 客户端] ID: ${newClientId}, IP: ${clientIp}, User-Agent: ${userAgent.substring(0, 80)}`);
           return;
         }
         
@@ -88,6 +94,45 @@ app.prepare().then(() => {
         return;
       }
       
+      // 调试接口：查看所有 HTTP 客户端
+      if (pathname === '/debug/http-clients' && req.method === 'GET') {
+        const clientsList = Array.from(httpClients.entries()).map(([id, info]) => ({
+          id,
+          ip: info.ip || 'unknown',
+          userAgent: info.userAgent || 'unknown',
+          createdAt: info.createdAt || 'unknown',
+          lastPollTime: info.lastPollTime ? new Date(info.lastPollTime).toISOString() : 'unknown',
+          inactiveMinutes: info.lastPollTime ? Math.floor((Date.now() - info.lastPollTime) / 1000 / 60) : 'unknown',
+          boundTo: info.boundTo,
+          queueLength: info.messageQueue.length,
+          deviceInfo: info.deviceInfo || null
+        }));
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          total: httpClients.size,
+          clients: clientsList
+        }, null, 2));
+        return;
+      }
+      
+      // 调试接口：查看所有 WebSocket 客户端
+      if (pathname === '/debug/ws-clients' && req.method === 'GET') {
+        const clientsList = Array.from(clients.entries()).map(([ws, info]) => ({
+          id: info.id,
+          boundTo: typeof info.boundTo === 'object' ? 'WebSocket' : info.boundTo,
+          deviceInfo: info.deviceInfo || null,
+          readyState: ws.readyState === WebSocket.OPEN ? 'OPEN' : ws.readyState === WebSocket.CONNECTING ? 'CONNECTING' : ws.readyState === WebSocket.CLOSING ? 'CLOSING' : 'CLOSED'
+        }));
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          total: clients.size,
+          clients: clientsList
+        }, null, 2));
+        return;
+      }
+      
       // 其他请求交给 Next.js 处理
       await handle(req, res, parsedUrl);
     } catch (err) {
@@ -116,12 +161,22 @@ app.prepare().then(() => {
   }
   
   // 处理 HTTP 推送消息
-  function handleHttpPush(data, res) {
+  function handleHttpPush(data, req, res) {
     try {
-      console.log('收到 HTTP 推送消息:', data);
+      const clientIp = req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+      const clientPort = req.socket.remotePort || 'unknown';
+      console.log(`收到 HTTP 推送消息 [${clientIp}:${clientPort}]:`, data);
       
       // 处理连接确认消息，分配客户端 ID（如果还没有）
       if (data.type === 'connected') {
+        // 如果消息中有 clientId，更新该客户端的设备信息
+        if (data.clientId && data.deviceInfo) {
+          const clientInfo = httpClients.get(data.clientId);
+          if (clientInfo) {
+            clientInfo.deviceInfo = data.deviceInfo;
+            console.log(`HTTP 客户端 ${data.clientId} 设备信息:`, JSON.stringify(data.deviceInfo));
+          }
+        }
         // 如果消息中没有 clientId，说明是新客户端，已经在 /poll 中处理了
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, message: '消息已接收' }));
@@ -316,7 +371,8 @@ app.prepare().then(() => {
     
     clients.set(ws, {
       id: clientId,
-      boundTo: null
+      boundTo: null,
+      deviceInfo: null
     });
 
     // 发送欢迎消息
@@ -335,6 +391,13 @@ app.prepare().then(() => {
         
         const clientInfo = clients.get(ws);
         if (!clientInfo) {
+          return;
+        }
+
+        // 处理连接确认消息（存储设备信息）
+        if (data.type === 'connected' && data.deviceInfo) {
+          clientInfo.deviceInfo = data.deviceInfo;
+          console.log(`客户端 ${clientInfo.id} 设备信息:`, JSON.stringify(data.deviceInfo));
           return;
         }
 
@@ -565,10 +628,15 @@ app.prepare().then(() => {
     const now = Date.now();
     const timeout = 5 * 60 * 1000; // 5 分钟
     
+    const totalClients = httpClients.size;
+    let cleanedCount = 0;
+    
     for (const [clientId, clientInfo] of httpClients.entries()) {
       if (clientInfo.lastPollTime && (now - clientInfo.lastPollTime) > timeout) {
-        console.log(`清理不活跃的 HTTP 客户端: ${clientId}`);
+        const inactiveTime = Math.floor((now - clientInfo.lastPollTime) / 1000 / 60); // 分钟
+        console.log(`[清理不活跃客户端] ID: ${clientId}, IP: ${clientInfo.ip || 'unknown'}, 创建时间: ${clientInfo.createdAt || 'unknown'}, 不活跃时间: ${inactiveTime}分钟`);
         httpClients.delete(clientId);
+        cleanedCount++;
         
         // 解除所有绑定到此客户端的连接
         clients.forEach((info, ws) => {
@@ -596,6 +664,11 @@ app.prepare().then(() => {
           }
         });
       }
+    }
+    
+    // 输出清理统计信息
+    if (cleanedCount > 0) {
+      console.log(`[客户端清理统计] 总客户端数: ${totalClients}, 已清理: ${cleanedCount}, 剩余: ${httpClients.size}`);
     }
   }, 60000); // 每分钟检查一次
 
