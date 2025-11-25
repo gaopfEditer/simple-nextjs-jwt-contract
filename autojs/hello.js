@@ -207,6 +207,85 @@ function handleMessage(messageStr) {
     }
 }
 
+// 第零步：检查并切换币种
+function checkAndSwitchSymbol(symbol) {
+    console.log("========== 检查币种: " + symbol + " ==========");
+    
+    // 从symbol中提取币种名称（例如 "BTC/USDT" -> "BTC"）
+    let targetCoin = symbol.split("/")[0].toUpperCase();
+    console.log("目标币种: " + targetCoin);
+    
+    // 查找当前显示的币种（例如 "ETHUSDT 永续"）
+    let currentSymbolView = descContains("USDT 永续").findOne(3000);
+    if (!currentSymbolView) {
+        currentSymbolView = descContains("永续").findOne(3000);
+    }
+    
+    if (!currentSymbolView) {
+        console.log("未找到币种显示区域");
+        return false;
+    }
+    
+    let currentDesc = currentSymbolView.desc() || "";
+    console.log("当前币种描述: " + currentDesc);
+    
+    // 从描述中提取当前币种（例如 "ETHUSDT 永续" -> "ETH"）
+    let currentCoin = "";
+    if (currentDesc.includes("USDT")) {
+        // 提取USDT之前的币种名称
+        let match = currentDesc.match(/([A-Z]+)USDT/);
+        if (match && match[1]) {
+            currentCoin = match[1].toUpperCase();
+        }
+    }
+    
+    console.log("当前币种: " + currentCoin + ", 目标币种: " + targetCoin);
+    
+    // 如果币种一致，不需要切换
+    if (currentCoin === targetCoin) {
+        console.log("币种一致，无需切换");
+        return true;
+    }
+    
+    // 币种不一致，需要切换
+    console.log("币种不一致，需要切换到: " + targetCoin);
+    
+    // 点击币种区域，打开选择弹窗
+    currentSymbolView.click();
+    console.log("已点击币种区域");
+    sleep(1500); // 等待弹窗出现
+    
+    // 在弹窗中查找并点击目标币种
+    // 查找包含目标币种名称的元素（例如 "BTC"）
+    let targetCoinBtn = desc(targetCoin).findOne(3000);
+    if (!targetCoinBtn) {
+        targetCoinBtn = text(targetCoin).findOne(3000);
+    }
+    if (!targetCoinBtn) {
+        // 尝试查找包含币种名称的按钮
+        let allViews = className("android.view.View").find();
+        for (let i = 0; i < allViews.length; i++) {
+            let desc = allViews[i].desc() || "";
+            let text = allViews[i].text() || "";
+            if (desc.includes(targetCoin) || text.includes(targetCoin)) {
+                targetCoinBtn = allViews[i];
+                break;
+            }
+        }
+    }
+    
+    if (targetCoinBtn) {
+        targetCoinBtn.click();
+        console.log("已点击币种: " + targetCoin);
+        sleep(1000); // 等待切换完成
+        return true;
+    } else {
+        console.log("未找到币种按钮: " + targetCoin);
+        toast("未找到币种: " + targetCoin);
+        return false;
+    }
+}
+
 // 第一步：检查全仓/分仓设置
 function checkMarginMode() {
     console.log("========== 检查全仓/分仓设置 ==========");
@@ -541,6 +620,20 @@ function executeBuyOrder(orderData) {
     toast("执行买入: " + orderData.symbol + " " + orderData.amount);
     
     try {
+        // 第零步：检查并切换币种
+        if (orderData.symbol) {
+            if (!checkAndSwitchSymbol(orderData.symbol)) {
+                sendMessage({
+                    "type": "order_result",
+                    "action": "buy",
+                    "status": "error",
+                    "message": "币种切换失败"
+                });
+                return false;
+            }
+            sleep(1000); // 等待币种切换完成
+        }
+        
         // 第一步：检查全仓/分仓
         if (!checkMarginMode()) {
             sendMessage({
@@ -659,6 +752,20 @@ function executeSellOrder(orderData) {
     toast("执行卖出: " + orderData.symbol + " " + orderData.amount);
     
     try {
+        // 第零步：检查并切换币种
+        if (orderData.symbol) {
+            if (!checkAndSwitchSymbol(orderData.symbol)) {
+                sendMessage({
+                    "type": "order_result",
+                    "action": "sell",
+                    "status": "error",
+                    "message": "币种切换失败"
+                });
+                return false;
+            }
+            sleep(1000); // 等待币种切换完成
+        }
+        
         // 第一步：检查全仓/分仓
         if (!checkMarginMode()) {
             sendMessage({
