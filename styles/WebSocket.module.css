@@ -340,3 +340,117 @@
   font-size: 12px;
 }
 
+.clientsList {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.clientsList h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #666;
+  font-weight: normal;
+}
+
+.clientsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.clientCard {
+  padding: 12px;
+  background-color: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.clientCard:hover {
+  border-color: #2196f3;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+  transform: translateY(-2px);
+}
+
+.clientCard.bound {
+  border-color: #4caf50;
+  background-color: #f1f8f4;
+}
+
+.clientId {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #666;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.deviceInfo {
+  margin-bottom: 8px;
+}
+
+.deviceName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.deviceDetails {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+  flex-wrap: wrap;
+}
+
+.androidId {
+  font-family: 'Courier New', monospace;
+  color: #999;
+}
+
+.noDeviceInfo {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.clientMeta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: #999;
+  flex-wrap: wrap;
+}
+
+.clientType {
+  padding: 2px 6px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.clientIp {
+  font-family: 'Courier New', monospace;
+}
+
+.boundBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
