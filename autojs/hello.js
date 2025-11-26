@@ -355,7 +355,7 @@ function ensureLimitOrder() {
                 console.log("已切换为限价委托");
                 return true;
             } else {
-                console.log("切换失败，请手动切换");
+                console.log("切换失败，请手动切换!");
                 toast("请手动切换到限价委托");
                 return false;
             }
