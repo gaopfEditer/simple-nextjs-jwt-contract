@@ -359,7 +359,7 @@ function handleMessage(messageStr) {
                             "message": "设备息屏，无法执行，请确认设备状态之后重新操作",
                             "invalid": true // 标记为无效订单
                         });
-                        toast("设备息屏，无法执行订单");
+                        toast("设备息屏，无法执行订单!");
                         console.log("已发送息屏消息，直接返回，不执行后续操作");
                         return; // 直接返回，不继续执行任何操作
                     } else {
