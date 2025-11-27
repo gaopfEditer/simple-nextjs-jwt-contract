@@ -1,7 +1,7 @@
 auto.waitFor();
 
 // WebSocket 配置
-const WS_HOST = "192.168.2.218";
+const WS_HOST = "192.168.1.132";
 const WS_PORT = 3000; // 根据服务器实际端口修改（默认 3000）
 const WS_URL = "ws://" + WS_HOST + ":" + WS_PORT + "/api/ws";
 
@@ -854,76 +854,98 @@ function selectSymbol(symbol) {
         return true;
     }
     
-    // 将 "BTC/USDT" 格式转换为 "BTCUSDT" 格式
-    let symbolText = symbol.replace("/", "").toUpperCase();
-    console.log("目标币种: " + symbolText);
+    // 从 symbol 中提取币种名称（例如 "BTC/USDT" -> "BTC"）
+    let targetCoin = symbol.split("/")[0].toUpperCase();
+    console.log("目标币种: " + targetCoin);
     
     try {
-        // 查找币种选择按钮（ImageView，描述包含币种和"永续"）
-        // 例如：描述为 "BTCUSDT 永续" 的 ImageView
+        // 查找顶部的币种选择按钮（ImageView，描述包含"USDT 永续"）
+        // 例如：描述为 "ETHUSDT 永续 +0.62%" 的 ImageView
         let symbolButton = null;
         
-        // 方法1: 通过描述查找（包含币种和"永续"）
+        // 方法1: 查找所有 ImageView，找到描述包含"USDT 永续"的
         let allImageViews = className("android.widget.ImageView").find();
         for (let i = 0; i < allImageViews.length; i++) {
             let desc = allImageViews[i].desc() || "";
-            if (desc.includes(symbolText) && desc.includes("永续")) {
+            if (desc.includes("USDT") && desc.includes("永续")) {
                 symbolButton = allImageViews[i];
-                console.log("找到币种选择按钮（方法1）: " + desc);
+                console.log("找到币种选择按钮: " + desc);
                 break;
             }
         }
         
-        // 方法2: 如果方法1没找到，尝试查找包含币种的任何可点击元素
         if (!symbolButton) {
-            let allViews = className("android.view.View").find();
-            for (let i = 0; i < allViews.length; i++) {
-                let desc = allViews[i].desc() || "";
-                let text = allViews[i].text() || "";
-                if ((desc.includes(symbolText) || text.includes(symbolText)) && 
-                    (desc.includes("永续") || text.includes("永续"))) {
-                    symbolButton = allViews[i];
-                    console.log("找到币种选择按钮（方法2）: " + (desc || text));
+            console.log("未找到币种选择按钮");
+            return false;
+        }
+        
+        // 从当前描述中提取币种（例如 "ETHUSDT 永续" -> "ETH"）
+        let currentDesc = symbolButton.desc() || "";
+        console.log("当前币种描述: " + currentDesc);
+        
+        let currentCoin = "";
+        if (currentDesc.includes("USDT")) {
+            // 提取USDT之前的币种名称（例如 "ETHUSDT" -> "ETH"）
+            let match = currentDesc.match(/([A-Z]+)USDT/);
+            if (match && match[1]) {
+                currentCoin = match[1].toUpperCase();
+            }
+        }
+        
+        console.log("当前币种: " + currentCoin + ", 目标币种: " + targetCoin);
+        
+        // 如果币种一致，不需要切换
+        if (currentCoin === targetCoin) {
+            console.log("币种一致，无需切换");
+            return true;
+        }
+        
+        // 币种不一致，需要切换
+        console.log("币种不一致，需要切换到: " + targetCoin);
+        
+        // 点击币种选择按钮，打开弹窗
+        symbolButton.click();
+        console.log("已点击币种选择按钮，等待弹窗打开...");
+        sleep(1500); // 等待弹窗打开
+        
+        // 在弹窗中选择目标币种（合约币种选项默认按照USDT计价，所以查找"BTCUSDT"格式）
+        let targetSymbolText = targetCoin + "USDT"; // 例如 "BTCUSDT"
+        console.log("在弹窗中选择币种: " + targetSymbolText);
+        let symbolOption = null;
+        
+        // 方法1: 通过文本查找币种（例如 "BTCUSDT"）
+        symbolOption = text(targetSymbolText).findOne(3000);
+        if (!symbolOption) {
+            // 方法2: 通过描述查找
+            symbolOption = desc(targetSymbolText).findOne(3000);
+        }
+        if (!symbolOption) {
+            // 方法3: 查找包含币种文本的元素（例如包含"BTCUSDT"）
+            symbolOption = textContains(targetSymbolText).findOne(3000);
+        }
+        if (!symbolOption) {
+            symbolOption = descContains(targetSymbolText).findOne(3000);
+        }
+        if (!symbolOption) {
+            // 方法4: 查找所有可点击元素，查找包含币种名称的
+            let allClickable = className("android.view.View").clickable(true).find();
+            for (let i = 0; i < allClickable.length; i++) {
+                let text = allClickable[i].text() || "";
+                let desc = allClickable[i].desc() || "";
+                if (text.includes(targetSymbolText) || desc.includes(targetSymbolText)) {
+                    symbolOption = allClickable[i];
                     break;
                 }
             }
         }
-        
-        if (!symbolButton) {
-            console.log("未找到币种选择按钮，可能已经是目标币种或按钮不存在");
-            return true; // 如果找不到按钮，假设已经是正确的币种
-        }
-        
-        // 检查当前显示的币种是否已经是目标币种
-        let currentDesc = symbolButton.desc() || "";
-        if (currentDesc.includes(symbolText)) {
-            console.log("当前币种已经是目标币种: " + symbolText);
-            return true;
-        }
-        
-        // 点击币种选择按钮，打开弹窗
-        console.log("点击币种选择按钮，打开弹窗...");
-        symbolButton.click();
-        sleep(1000); // 等待弹窗打开
-        
-        // 在弹窗中选择目标币种
-        console.log("在弹窗中选择币种: " + symbolText);
-        let symbolSelected = false;
-        
-        // 方法1: 通过文本查找
-        let symbolOption = text(symbolText).findOne(3000);
         if (!symbolOption) {
-            // 方法2: 通过描述查找
-            symbolOption = desc(symbolText).findOne(3000);
-        }
-        if (!symbolOption) {
-            // 方法3: 查找包含币种文本的元素
-            let allOptions = className("android.widget.TextView").find();
-            for (let i = 0; i < allOptions.length; i++) {
-                let optionText = allOptions[i].text() || "";
-                let optionDesc = allOptions[i].desc() || "";
-                if (optionText.includes(symbolText) || optionDesc.includes(symbolText)) {
-                    symbolOption = allOptions[i];
+            // 方法5: 查找 TextView，查找包含币种名称的
+            let allTextViews = className("android.widget.TextView").find();
+            for (let i = 0; i < allTextViews.length; i++) {
+                let text = allTextViews[i].text() || "";
+                let desc = allTextViews[i].desc() || "";
+                if (text.includes(targetSymbolText) || desc.includes(targetSymbolText)) {
+                    symbolOption = allTextViews[i];
                     break;
                 }
             }
@@ -931,18 +953,16 @@ function selectSymbol(symbol) {
         
         if (symbolOption) {
             symbolOption.click();
-            console.log("已选择币种: " + symbolText);
-            sleep(1000); // 等待弹窗关闭
-            symbolSelected = true;
+            console.log("已选择币种: " + targetSymbolText);
+            sleep(1000); // 等待弹窗关闭和币种切换完成
+            return true;
         } else {
-            console.log("未找到币种选项: " + symbolText);
+            console.log("未找到币种选项: " + targetSymbolText);
             // 尝试关闭弹窗
             back();
             sleep(500);
             return false;
         }
-        
-        return symbolSelected;
     } catch (e) {
         console.log("选择币种失败: " + e);
         // 尝试关闭可能打开的弹窗
