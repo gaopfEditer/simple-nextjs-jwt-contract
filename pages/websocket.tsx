@@ -67,6 +67,9 @@ export default function WebSocketPage() {
 }`);
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [localIp, setLocalIp] = useState<string>('');
+  const [ipType, setIpType] = useState<'local' | 'public'>('local');
+  const [ipPort, setIpPort] = useState<number>(3000);
   const sendOrderDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,21 @@ export default function WebSocketPage() {
       }
     } catch (e) {
       console.error('加载历史订单失败:', e);
+    }
+  }, []);
+
+  // 加载消息历史
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('websocketMessages');
+      if (saved) {
+        const savedMessages = JSON.parse(saved) as Message[];
+        // 最多恢复最近 500 条消息
+        const recentMessages = savedMessages.slice(-500);
+        setMessages(recentMessages);
+      }
+    } catch (e) {
+      console.error('加载消息历史失败:', e);
     }
   }, []);
 
@@ -199,6 +217,24 @@ export default function WebSocketPage() {
       return '刚刚';
     }
   };
+
+  // 获取本地 IP 地址
+  useEffect(() => {
+    const fetchLocalIp = async () => {
+      try {
+        const response = await fetch('/api/local-ip');
+        const data = await response.json();
+        if (data.ip) {
+          setLocalIp(data.ip);
+          setIpType(data.type || 'local');
+          setIpPort(data.port || 3000);
+        }
+      } catch (error) {
+        console.error('获取本地 IP 失败:', error);
+      }
+    };
+    fetchLocalIp();
+  }, []);
 
   // 组件挂载时自动连接
   useEffect(() => {
@@ -647,7 +683,17 @@ export default function WebSocketPage() {
   };
 
   const addMessage = (message: Message) => {
-    setMessages((prev) => [...prev, message]);
+    setMessages((prev) => {
+      const newMessages = [...prev, message];
+      // 保存到 localStorage（最多保存 500 条）
+      try {
+        const messagesToSave = newMessages.slice(-500);
+        localStorage.setItem('websocketMessages', JSON.stringify(messagesToSave));
+      } catch (e) {
+        console.error('保存消息历史失败:', e);
+      }
+      return newMessages;
+    });
   };
 
   const formatTime = (timestamp: string) => {
@@ -743,6 +789,25 @@ export default function WebSocketPage() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1>WebSocket 测试客户端</h1>
+        {localIp && (
+          <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+            {ipType === 'public' ? (
+              <>
+                服务器地址: <strong style={{ color: '#0070f3' }}>{localIp}{ipPort === 80 || ipPort === 443 ? '' : `:${ipPort}`}</strong>
+                <span style={{ marginLeft: '10px', fontSize: '12px', color: '#999' }}>
+                  (公网地址，所有设备可通过此地址连接)
+                </span>
+              </>
+            ) : (
+              <>
+                本机局域网 IP: <strong style={{ color: '#0070f3' }}>{localIp}:{ipPort}</strong>
+                <span style={{ marginLeft: '10px', fontSize: '12px', color: '#999' }}>
+                  (其他设备可通过此地址连接)
+                </span>
+              </>
+            )}
+          </div>
+        )}
         <div className={styles.status}>
           <span className={`${styles.statusIndicator} ${isConnected ? styles.connected : styles.disconnected}`}>
             {isConnected ? '●' : '○'}
@@ -755,7 +820,10 @@ export default function WebSocketPage() {
 
       <div className={styles.controls}>
         <button 
-          onClick={() => setMessages([])}
+          onClick={() => {
+            setMessages([]);
+            localStorage.removeItem('websocketMessages');
+          }}
           className={styles.button}
         >
           清空消息
