@@ -395,7 +395,7 @@ function handleMessage(messageStr) {
                 });
                 return;
             }
-            sleep(2000); // 等待应用打开并加载
+            sleep(800); // 等待应用打开并加载
         }
         
         if (data.action === "buy") {
@@ -490,7 +490,7 @@ function ensureLimitOrder() {
         } else if (descText.includes("市价委托") || textContent.includes("市价委托")) {
             console.log("当前是市价委托，需要切换为限价");
             orderTypeView.click();
-            sleep(1000); // 等待弹窗打开
+            sleep(800); // 等待弹窗打开
             
             // 在弹窗中选择"限价委托"
             console.log("在弹窗中选择限价委托...");
@@ -522,7 +522,7 @@ function ensureLimitOrder() {
             if (limitOption) {
                 console.log("找到限价委托选项，准备点击");
                 limitOption.click();
-                sleep(1000); // 等待弹窗关闭
+                sleep(800); // 等待弹窗关闭
                 console.log("已点击限价委托选项");
                 
                 // 再次检查是否切换成功
@@ -658,7 +658,7 @@ function setStopLossAndTakeProfit(stopLoss, takeProfit) {
     while (retryCount <= maxRetries) {
         if (retryCount > 0) {
             console.log("========== 第 " + retryCount + " 次重试设置止盈止损 ==========");
-            sleep(1000); // 重试前等待
+            sleep(800); // 重试前等待
         }
         
         // 1. 点击"止盈/止损"按钮
@@ -684,7 +684,7 @@ function setStopLossAndTakeProfit(stopLoss, takeProfit) {
         
         stopLossBtn.click();
         console.log("已点击止盈/止损按钮");
-        sleep(1500); // 等待弹窗或界面展开
+        sleep(800); // 等待弹窗或界面展开
         
         let success = true;
         
@@ -762,7 +762,7 @@ function setStopLossAndTakeProfit(stopLoss, takeProfit) {
                 let screenHeight = device.height;
                 // 点击屏幕顶部空白区域
                 click(screenWidth / 2, 100);
-                sleep(300);
+                sleep(500);
             } catch (e) {
                 console.log("点击空白区域失败: " + e);
             }
@@ -770,7 +770,7 @@ function setStopLossAndTakeProfit(stopLoss, takeProfit) {
             try {
                 // 方法2: 使用返回键关闭键盘（如果键盘打开）
                 back();
-                sleep(300);
+                sleep(500);
             } catch (e) {
                 console.log("使用返回键失败: " + e);
             }
@@ -906,7 +906,7 @@ function selectSymbol(symbol) {
         // 点击币种选择按钮，打开弹窗
         symbolButton.click();
         console.log("已点击币种选择按钮，等待弹窗打开...");
-        sleep(1500); // 等待弹窗打开
+        sleep(800); // 等待弹窗打开
         
         // 在弹窗中选择目标币种（合约币种选项默认按照USDT计价，所以查找"BTCUSDT"格式）
         let targetSymbolText = targetCoin + "USDT"; // 例如 "BTCUSDT"
@@ -954,7 +954,7 @@ function selectSymbol(symbol) {
         if (symbolOption) {
             symbolOption.click();
             console.log("已选择币种: " + targetSymbolText);
-            sleep(1000); // 等待弹窗关闭和币种切换完成
+            sleep(800); // 等待弹窗关闭和币种切换完成
             return true;
         } else {
             console.log("未找到币种选项: " + targetSymbolText);
@@ -972,6 +972,41 @@ function selectSymbol(symbol) {
         } catch (e2) {
             console.log("关闭弹窗失败: " + e2);
         }
+        return false;
+    }
+}
+
+// 查看委托列表（点击"委托"标签）
+function viewOrderList() {
+    console.log("========== 查看委托列表 ==========");
+    
+    try {
+        // 查找"委托 (n)"标签，其中n是委托数量
+        // 描述格式: "委托 (n)\n第 2 个标签，共 2 个"
+        let orderTab = descContains("委托 (").findOne(3000);
+        if (!orderTab) {
+            // 尝试查找包含"委托"的标签
+            orderTab = descContains("委托").findOne(3000);
+        }
+        if (!orderTab) {
+            // 尝试通过文本查找
+            orderTab = textContains("委托").findOne(3000);
+        }
+        
+        if (orderTab) {
+            console.log("找到委托标签，准备点击");
+            let desc = orderTab.desc() || "";
+            console.log("委托标签描述: " + desc);
+            orderTab.click();
+            console.log("已点击委托标签，查看委托列表");
+            sleep(800); // 等待页面切换
+            return true;
+        } else {
+            console.log("未找到委托标签");
+            return false;
+        }
+    } catch (e) {
+        console.log("查看委托列表失败: " + e);
         return false;
     }
 }
@@ -1063,50 +1098,54 @@ function executeBuyOrder(orderData) {
         }
         
         // todo 后续要根据前端的配置来设置是否直接下单。
-        // // 第六步：点击"开多"按钮
-        // let buyButton = desc("开多").findOne(3000);
-        // if (!buyButton) {
-        //     buyButton = text("开多").findOne(3000);
-        // }
-        // if (!buyButton) {
-        //     // 尝试查找包含"开多"的按钮
-        //     let allViews = className("android.view.View").find();
-        //     for (let i = 0; i < allViews.length; i++) {
-        //         let desc = allViews[i].desc() || "";
-        //         if (desc.includes("开多")) {
-        //             buyButton = allViews[i];
-        //             break;
-        //         }
-        //     }
-        // }
+        // 第六步：点击"开多"按钮
+        let buyButton = desc("开多").findOne(3000);
+        if (!buyButton) {
+            buyButton = text("开多").findOne(3000);
+        }
+        if (!buyButton) {
+            // 尝试查找包含"开多"的按钮
+            let allViews = className("android.view.View").find();
+            for (let i = 0; i < allViews.length; i++) {
+                let desc = allViews[i].desc() || "";
+                if (desc.includes("开多")) {
+                    buyButton = allViews[i];
+                    break;
+                }
+            }
+        }
         
-        // if (buyButton) {
-        //     buyButton.click();
-        //     console.log("已点击开多按钮");
-        //     toast("已提交买入订单");
-        //     sleep(1000);
+        if (buyButton) {
+            buyButton.click();
+            console.log("已点击开多按钮");
+            toast("已提交买入订单");
+            sleep(800);
             
-        //     // 发送执行结果
-        //     sendMessage({
-        //         "type": "order_result",
-        //         "action": "buy",
-        //         "status": "success",
-        //         "orderId": "ORDER_" + new Date().getTime(),
-        //         "message": "买入订单已执行"
-        //     });
-        //     return true;
-        // } else {
-        //     console.log("未找到开多按钮");
-        //     toast("未找到开多按钮");
+            // 发送执行结果
+            sendMessage({
+                "type": "order_result",
+                "action": "buy",
+                "status": "success",
+                "orderId": "ORDER_" + new Date().getTime(),
+                "message": "买入订单已执行"
+            });
             
-        //     sendMessage({
-        //         "type": "order_result",
-        //         "action": "buy",
-        //         "status": "error",
-        //         "message": "未找到开多按钮"
-        //     });
-        //     return false;
-        // }
+            // 第七步：查看委托列表
+            viewOrderList();
+            
+            return true;
+        } else {
+            console.log("未找到开多按钮");
+            toast("未找到开多按钮");
+            
+            sendMessage({
+                "type": "order_result",
+                "action": "buy",
+                "status": "error",
+                "message": "未找到开多按钮"
+            });
+            return false;
+        }
     } catch (e) {
         console.log("执行买入订单失败: " + e);
         toast("执行失败: " + e);
@@ -1228,7 +1267,7 @@ function executeSellOrder(orderData) {
             sellButton.click();
             console.log("已点击开空按钮");
             toast("已提交卖出订单");
-            sleep(1000);
+            sleep(800);
             
             // 发送执行结果
             sendMessage({
@@ -1238,6 +1277,10 @@ function executeSellOrder(orderData) {
                 "orderId": "ORDER_" + new Date().getTime(),
                 "message": "卖出订单已执行"
             });
+            
+            // 第七步：查看委托列表
+            viewOrderList();
+            
             return true;
         } else {
             console.log("未找到开空按钮");
@@ -1478,7 +1521,7 @@ function openYiBiApp() {
         contractButton.click();
         toast("已点击合约按钮");
         console.log("已点击合约按钮");
-        sleep(2000); // 等待页面加载
+        sleep(800); // 等待页面加载
         return true;
     } else {
         console.log("未找到合约按钮，请手动点击");
@@ -1532,7 +1575,7 @@ if (openYiBiApp()) {
     console.log("========== 应用已打开，开始打印页面元素 ==========");
     
     // 等待页面完全加载
-    sleep(2000);
+    sleep(800);
     
     // 获取当前窗口的根节点
     let root = className("android.view.View").findOne(3000);
@@ -1570,22 +1613,22 @@ if (openYiBiApp()) {
     console.log("应用打开失败，跳过元素打印");
 }
 
-// ========== 测试代码：手动执行一条测试订单 ==========
-// 取消下面的注释来执行测试
+// // ========== 测试代码：手动执行一条测试订单 ==========
+// // 取消下面的注释来执行测试
 
-console.log("========== 开始测试订单执行 ==========");
-const testOrder = {
-    "action": "buy",
-    "symbol": "BTC/USDT",
-    "amount": 0.01,
-    "price": 50000,
-    "orderType": "limit",
-    "leverage": 10,
-    "stopLoss": 49000,
-    "takeProfit": 52000
-};
+// console.log("========== 开始测试订单执行 ==========");
+// const testOrder = {
+//     "action": "buy",
+//     "symbol": "BTC/USDT",
+//     "amount": 0.01,
+//     "price": 50000,
+//     "orderType": "limit",
+//     "leverage": 10,
+//     "stopLoss": 49000,
+//     "takeProfit": 52000
+// };
 
-// 等待应用打开并进入合约页面
-sleep(5000);
-handleMessage(JSON.stringify(testOrder));
+// // 等待应用打开并进入合约页面
+// sleep(5000);
+// handleMessage(JSON.stringify(testOrder));
 

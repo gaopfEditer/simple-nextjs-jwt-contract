@@ -129,6 +129,71 @@ export default function WebSocketPage() {
     }
   }, []);
 
+  // 加载用户输入（orderJson 和 bindTargetId）
+  useEffect(() => {
+    try {
+      const savedOrderJson = localStorage.getItem('orderJson');
+      if (savedOrderJson && savedOrderJson.trim()) {
+        setOrderJson(savedOrderJson);
+      }
+      
+      const savedBindTargetId = localStorage.getItem('bindTargetId');
+      if (savedBindTargetId && savedBindTargetId.trim()) {
+        setBindTargetId(savedBindTargetId);
+      }
+    } catch (e) {
+      console.error('加载用户输入失败:', e);
+    }
+  }, []);
+
+  // 当连接建立且已恢复 bindTargetId 时，自动绑定
+  useEffect(() => {
+    if (isConnected && bindTargetId && bindTargetId.trim() && wsRef.current && !boundTo) {
+      // 延迟一下，确保连接完全建立
+      const timer = setTimeout(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          console.log('自动绑定已恢复的目标客户端:', bindTargetId);
+          wsRef.current.send(JSON.stringify({
+            type: 'bind',
+            targetClientId: bindTargetId.trim(),
+            timestamp: new Date().toISOString()
+          }));
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, bindTargetId]);
+
+  // 保存 orderJson 到 localStorage（防抖保存）
+  useEffect(() => {
+    const saveTimer = setTimeout(() => {
+      try {
+        if (orderJson.trim()) {
+          localStorage.setItem('orderJson', orderJson);
+        }
+      } catch (e) {
+        console.error('保存 orderJson 失败:', e);
+      }
+    }, 500); // 500ms 防抖
+
+    return () => clearTimeout(saveTimer);
+  }, [orderJson]);
+
+  // 保存 bindTargetId 到 localStorage
+  useEffect(() => {
+    try {
+      if (bindTargetId.trim()) {
+        localStorage.setItem('bindTargetId', bindTargetId);
+      } else {
+        localStorage.removeItem('bindTargetId');
+      }
+    } catch (e) {
+      console.error('保存 bindTargetId 失败:', e);
+    }
+  }, [bindTargetId]);
+
   // 保存历史订单到 localStorage
   const saveOrderToHistory = (order: any) => {
     try {
@@ -970,7 +1035,7 @@ export default function WebSocketPage() {
             disabled={!isConnected || !boundTo || !orderJson.trim()}
             className={styles.sendOrderButton}
           >
-            发送订单
+            发送
           </button>
           {!boundTo && (
             <div className={styles.warning}>请先绑定目标客户端才能发送订单</div>
