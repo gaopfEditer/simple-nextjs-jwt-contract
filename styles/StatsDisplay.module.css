@@ -1,0 +1,80 @@
+.statsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #666;
+  margin: 1rem 0;
+}
+
+.statItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.statLabel {
+  color: #666;
+  font-weight: 500;
+}
+
+.statValue {
+  color: #333;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.statUnit {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.articleStats {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0.5rem 0;
+}
+
+.articleStatLabel {
+  color: #666;
+  font-weight: 500;
+}
+
+.articleStatValue {
+  color: #333;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.articleStatUnit {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.loading {
+  color: #999;
+  font-style: italic;
+}
+
+.error {
+  color: #e74c3c;
+  font-size: 0.9rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .statsContainer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .statItem {
+    width: 100%;
+  }
+}
+

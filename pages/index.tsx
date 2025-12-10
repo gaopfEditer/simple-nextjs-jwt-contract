@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/api';
+import StatsDisplay from '@/components/StatsDisplay';
 import styles from '../styles/Home.module.css';
 
 export default function Home() {
@@ -47,6 +48,25 @@ export default function Home() {
           <p className={styles.description}>
             这是一个基于 Next.js 和 JWT 的用户认证示例项目
           </p>
+
+          {/* 显示访问统计 */}
+          <StatsDisplay />
+
+          <div className={styles.demoSection}>
+            <h2 className={styles.sectionTitle}>示例功能</h2>
+            <p className={styles.sectionDesc}>访问示例文章查看阅读量统计，或进入管理页面查看详细数据</p>
+            <div className={styles.actions}>
+              <Link href="/article/1" className="btn btn-secondary">
+                查看示例文章 1
+              </Link>
+              <Link href="/article/2" className="btn btn-secondary">
+                查看示例文章 2
+              </Link>
+              <Link href="/stats/admin" className="btn btn-primary">
+                访问统计管理
+              </Link>
+            </div>
+          </div>
 
           {user ? (
             <div className={styles.userInfo}>

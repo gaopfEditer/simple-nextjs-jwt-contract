@@ -66,6 +66,29 @@
   color: #666;
 }
 
+.demoSection {
+  margin: 2rem 0;
+  padding: 2rem;
+  background: #f9f9f9;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.sectionDesc {
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
 @media (max-width: 600px) {
   .title {
     font-size: 2rem;
