@@ -13,12 +13,26 @@ export default async function handler(
   try {
     const siteId = getSiteId(req);
     const limit = parseInt(req.query.limit as string) || 50;
-    const visits = await getRecentVisits(siteId, limit);
+    const beforeId = req.query.beforeId ? parseInt(req.query.beforeId as string) : undefined;
+    const beforeTime = req.query.beforeTime ? new Date(req.query.beforeTime as string) : undefined;
+    const days = req.query.days ? parseInt(req.query.days as string) : 30; // 默认查询最近30天
+    
+    const visits = await getRecentVisits(siteId, limit, {
+      beforeId,
+      beforeTime,
+      days,
+      includeFields: ['visitor_id', 'user_agent', 'referer'], // 可选：包含额外字段
+    });
 
     return res.status(200).json({
       siteId,
       visits,
       count: visits.length,
+      // 用于游标分页
+      nextCursor: visits.length > 0 ? {
+        id: visits[visits.length - 1].id,
+        time: visits[visits.length - 1].created_at,
+      } : null,
     });
   } catch (error: any) {
     console.error('获取最近访问记录错误:', error);
@@ -28,4 +42,3 @@ export default async function handler(
     });
   }
 }
-

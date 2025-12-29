@@ -1,7 +1,16 @@
+// 加载环境变量（必须在最前面）
+// 优先加载 .env.local，如果不存在则加载 .env
+require('dotenv').config({ path: '.env.local' });
+// 如果 .env.local 不存在，尝试加载 .env（用于兼容性）
+if (!process.env.DB_HOST && !process.env.DB_USER) {
+  require('dotenv').config();
+}
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const WebSocket = require('ws');
+const mysql = require('mysql2/promise');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -9,6 +18,54 @@ const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
+
+// 数据库配置（与lib/db-connection.ts保持一致）
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '3306'),
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'nextjs_jwt',
+  waitForConnections: true,
+  connectionLimit: 5,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  multipleStatements: false,
+};
+
+// 创建数据库连接池
+let dbPool = null;
+function getDbPool() {
+  if (!dbPool) {
+    console.log('[数据库] 创建连接池...');
+    console.log('[数据库] 配置:', {
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      database: dbConfig.database,
+      passwordSet: !!dbConfig.password,
+    });
+    
+    dbPool = mysql.createPool(dbConfig);
+    
+    // 测试连接
+    dbPool.getConnection()
+      .then((connection) => {
+        console.log('[数据库] ✅ 连接池创建成功');
+        connection.release();
+      })
+      .catch((error) => {
+        console.error('[数据库] ❌ 连接失败:', error.message);
+        console.error('[数据库] 错误代码:', error.code);
+        console.error('[数据库] 请检查:');
+        console.error('  1. MySQL 服务是否运行');
+        console.error('  2. 环境变量是否正确设置 (.env 文件)');
+        console.error('  3. 数据库配置是否正确');
+      });
+  }
+  return dbPool;
+}
 
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
@@ -130,6 +187,53 @@ app.prepare().then(() => {
           total: clients.size,
           clients: clientsList
         }, null, 2));
+        return;
+      }
+      
+      // 立即触发消息转发接口（用于API创建消息后立即转发）
+      if (pathname === '/api/messages/forward' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          try {
+            // 如果请求体中有消息数据，直接转发
+            if (body) {
+              const messageData = JSON.parse(body);
+              if (messageData.id && messageData.content) {
+                // 直接转发消息，不需要从数据库读取
+                forwardMessageToClients(messageData).then(forwardedCount => {
+                  console.log(`[立即转发] 消息 ID: ${messageData.id} 已转发给 ${forwardedCount} 个客户端`);
+                }).catch(err => {
+                  console.error('[立即转发] 转发失败:', err);
+                });
+              }
+            }
+            
+            // 同时触发一次数据库检查（用于转发之前未转发的消息）
+            checkAndForwardMessages().catch(err => {
+              // 静默处理数据库错误
+            });
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: '已触发消息转发'
+            }));
+          } catch (e) {
+            // 如果解析失败，只触发数据库检查
+            checkAndForwardMessages().catch(err => {
+              // 静默处理数据库错误
+            });
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: '已触发消息转发检查'
+            }));
+          }
+        });
         return;
       }
       
@@ -623,6 +727,161 @@ app.prepare().then(() => {
     });
   });
 
+  // 转发消息到所有WebSocket客户端
+  async function forwardMessageToClients(message) {
+    const messageData = {
+      type: 'message_received',
+      message: {
+        id: message.id,
+        source: message.source,
+        source_id: message.source_id,
+        type: message.type,
+        title: message.title,
+        content: message.content,
+        metadata: message.metadata,
+        sender: message.sender,
+        sender_id: message.sender_id,
+        created_at: message.created_at
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    let forwardedCount = 0;
+    const messageJson = JSON.stringify(messageData);
+
+    console.log(`[WebSocket转发] 准备转发消息，当前WebSocket客户端数: ${clients.size}`);
+    console.log(`[WebSocket转发] 消息数据:`, JSON.stringify(messageData, null, 2));
+
+    // 转发给所有WebSocket客户端
+    clients.forEach((clientInfo, ws) => {
+      const state = ws.readyState;
+      console.log(`[WebSocket转发] 客户端 ${clientInfo.id} 状态: ${state} (OPEN=${WebSocket.OPEN})`);
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(messageJson);
+          forwardedCount++;
+          console.log(`[WebSocket转发] 消息已发送到客户端 ${clientInfo.id}`);
+        } catch (error) {
+          console.error(`[WebSocket转发] 转发消息到WebSocket客户端失败 (${clientInfo.id}):`, error);
+        }
+      } else {
+        console.log(`[WebSocket转发] 跳过客户端 ${clientInfo.id}，状态不是OPEN (${state})`);
+      }
+    });
+
+    // 转发给所有HTTP客户端（放入消息队列）
+    httpClients.forEach((httpInfo, httpId) => {
+      try {
+        httpInfo.messageQueue.push(messageData);
+        forwardedCount++;
+      } catch (error) {
+        console.error(`转发消息到HTTP客户端失败 (${httpId}):`, error);
+      }
+    });
+
+    if (forwardedCount > 0) {
+      console.log(`[WebSocket转发] 消息已转发给 ${forwardedCount} 个客户端:`, {
+        id: message.id,
+        source: message.source,
+        type: message.type,
+        content: message.content?.substring(0, 50)
+      });
+    } else {
+      console.warn(`[WebSocket转发] 警告：消息 ID: ${message.id} 没有转发给任何客户端（当前连接数: WebSocket=${clients.size}, HTTP=${httpClients.size}）`);
+    }
+
+    return forwardedCount;
+  }
+
+  // 检查并转发未转发的消息
+  async function checkAndForwardMessages() {
+    try {
+      const pool = getDbPool();
+      
+      // 获取未转发的消息（最多100条）
+      let rows;
+      try {
+        [rows] = await pool.execute(
+          'SELECT * FROM messages WHERE forwarded = 0 ORDER BY created_at ASC LIMIT 100'
+        );
+      } catch (error) {
+        // 如果是连接错误，静默处理，不输出日志（避免刷屏）
+        if (error.code === 'ECONNREFUSED' || error.code === 'PROTOCOL_CONNECTION_LOST') {
+          // 连接失败，直接返回，不处理
+          return;
+        }
+        // 其他错误才输出
+        console.error('[消息转发] 数据库查询错误:', error.message);
+        return;
+      }
+
+      if (!rows || rows.length === 0) {
+        return;
+      }
+
+      console.log(`[消息转发] 发现 ${rows.length} 条未转发的消息，开始转发...`);
+
+      for (const row of rows) {
+        try {
+          // 解析metadata（如果是JSON字符串）
+          let metadata = row.metadata;
+          if (metadata && typeof metadata === 'string') {
+            try {
+              metadata = JSON.parse(metadata);
+            } catch (e) {
+              // 如果解析失败，保持原样
+            }
+          }
+
+          const message = {
+            id: row.id,
+            source: row.source,
+            source_id: row.source_id,
+            type: row.type,
+            title: row.title,
+            content: row.content,
+            metadata: metadata,
+            sender: row.sender,
+            sender_id: row.sender_id,
+            created_at: row.created_at
+          };
+
+          // 转发消息
+          console.log(`[消息转发] 准备转发消息 ID: ${row.id}, 内容: ${row.content?.substring(0, 50)}...`);
+          const forwardedCount = await forwardMessageToClients(message);
+          console.log(`[消息转发] 消息 ID: ${row.id} 已转发给 ${forwardedCount} 个客户端`);
+
+          // 标记为已转发
+          if (forwardedCount > 0) {
+            await pool.execute(
+              'UPDATE messages SET forwarded = 1 WHERE id = ?',
+              [row.id]
+            );
+            console.log(`[消息转发] 消息 ID: ${row.id} 已标记为已转发`);
+          } else {
+            console.warn(`[消息转发] 警告：消息 ID: ${row.id} 没有转发给任何客户端`);
+          }
+        } catch (error) {
+          console.error(`转发消息失败 (ID: ${row.id}):`, error);
+        }
+      }
+
+      console.log(`[消息转发] 转发完成，处理了 ${rows.length} 条消息`);
+    } catch (error) {
+      // 静默处理错误，避免日志刷屏
+      // 只在非连接错误时输出
+      if (error.code !== 'ECONNREFUSED' && error.code !== 'PROTOCOL_CONNECTION_LOST') {
+        console.error('[消息转发] 处理消息时出错:', error.message);
+      }
+    }
+  }
+
+  // 定期检查并转发未转发的消息（每1秒检查一次，确保消息及时转发）
+  setInterval(() => {
+    checkAndForwardMessages();
+  }, 1000); // 每1秒检查一次
+
   // 定期清理不活跃的 HTTP 客户端（超过 5 分钟没有轮询）
   setInterval(() => {
     const now = Date.now();
@@ -677,9 +936,16 @@ app.prepare().then(() => {
       console.error(err);
       process.exit(1);
     })
-    .listen(port, () => {
+    .listen(port, async () => {
       console.log(`> 服务器已启动: http://${hostname}:${port}`);
       console.log(`> WebSocket 服务器已启动: ws://${hostname}:${port}/api/ws`);
+      console.log(`> 消息API: http://${hostname}:${port}/api/messages/receive`);
+      
+      // 服务器启动后立即检查一次未转发的消息
+      setTimeout(() => {
+        console.log('> 检查未转发的消息...');
+        checkAndForwardMessages();
+      }, 2000); // 延迟2秒，确保数据库连接已建立
     });
 });
 

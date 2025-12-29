@@ -40,7 +40,7 @@ export default function StatsAdmin() {
         axios.get('/api/stats/overview', {
           headers: { 'X-Site-ID': currentSiteId },
         }),
-        axios.get('/api/stats/recent?limit=100', {
+        axios.get('/api/stats/recent?limit=100&days=30', {
           headers: { 'X-Site-ID': currentSiteId },
         }),
         axios.get('/api/stats/popular?limit=100', {

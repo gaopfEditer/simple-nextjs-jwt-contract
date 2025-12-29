@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import ChatBox from '@/components/ChatBox';
 import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
@@ -9,19 +9,19 @@ import styles from '../styles/HomePage.module.css';
 
 type TabType = 'chat' | 'home' | 'dashboard';
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [activeTab, setActiveTab] = useState<TabType>('chat');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // 检查用户登录状态
   useEffect(() => {
     async function checkAuth() {
       try {
         const userData = await getCurrentUser();
         setUser(userData);
       } catch (error) {
-        // 未登录
         setUser(null);
       } finally {
         setLoading(false);
@@ -30,21 +30,12 @@ export default function Home() {
     checkAuth();
   }, []);
 
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>加载中...</div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Head>
-        <title>JWT 认证系统</title>
-        <meta name="description" content="Next.js JWT 认证示例" />
+        <title>消息中心 - JWT 认证系统</title>
+        <meta name="description" content="消息中心、首页和仪表盘" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
       <div className={styles.container}>
         <nav className={styles.nav}>
@@ -83,7 +74,7 @@ export default function Home() {
               onClick={() => setActiveTab('chat')}
             >
               <span className={styles.tabIcon}>💬</span>
-              <span>聊天室</span>
+              <span>聊天框</span>
             </button>
             <button
               className={`${styles.tab} ${activeTab === 'home' ? styles.active : ''}`}
@@ -122,7 +113,9 @@ export default function Home() {
 
                 <div className={styles.demoSection}>
                   <h2 className={styles.sectionTitle}>示例功能</h2>
-                  <p className={styles.sectionDesc}>访问示例文章查看阅读量统计，或进入管理页面查看详细数据</p>
+                  <p className={styles.sectionDesc}>
+                    访问示例文章查看阅读量统计，或进入管理页面查看详细数据
+                  </p>
                   <div className={styles.actions}>
                     <Link href="/article/1" className="btn btn-secondary">
                       查看示例文章 1
@@ -163,7 +156,9 @@ export default function Home() {
           {activeTab === 'dashboard' && (
             <div className={styles.tabContent}>
               <div className={styles.dashboardContent}>
-                {user ? (
+                {loading ? (
+                  <div className={styles.loading}>加载中...</div>
+                ) : user ? (
                   <>
                     <h1 className={styles.title}>欢迎回来，{user.email}！</h1>
                     <div className={styles.userInfo}>
