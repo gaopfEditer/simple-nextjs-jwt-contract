@@ -787,8 +787,6 @@ app.prepare().then(() => {
         type: message.type,
         content: message.content?.substring(0, 50)
       });
-    } else {
-      console.warn(`[WebSocket转发] 警告：消息 ID: ${message.id} 没有转发给任何客户端（当前连接数: WebSocket=${clients.size}, HTTP=${httpClients.size}）`);
     }
 
     return forwardedCount;
@@ -848,26 +846,20 @@ app.prepare().then(() => {
           };
 
           // 转发消息
-          console.log(`[消息转发] 准备转发消息 ID: ${row.id}, 内容: ${row.content?.substring(0, 50)}...`);
           const forwardedCount = await forwardMessageToClients(message);
-          console.log(`[消息转发] 消息 ID: ${row.id} 已转发给 ${forwardedCount} 个客户端`);
-
+        
           // 标记为已转发
           if (forwardedCount > 0) {
             await pool.execute(
               'UPDATE messages SET forwarded = 1 WHERE id = ?',
               [row.id]
             );
-            console.log(`[消息转发] 消息 ID: ${row.id} 已标记为已转发`);
-          } else {
-            console.warn(`[消息转发] 警告：消息 ID: ${row.id} 没有转发给任何客户端`);
           }
         } catch (error) {
           console.error(`转发消息失败 (ID: ${row.id}):`, error);
         }
       }
 
-      console.log(`[消息转发] 转发完成，处理了 ${rows.length} 条消息`);
     } catch (error) {
       // 静默处理错误，避免日志刷屏
       // 只在非连接错误时输出
