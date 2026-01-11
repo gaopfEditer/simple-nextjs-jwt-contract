@@ -7,36 +7,25 @@ import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
 import styles from '../styles/HomePage.module.css';
 
-type TabType = 'chat' | 'home' | 'dashboard';
+type TabType = 'chat' | 'signals' | 'home' | 'dashboard';
 
 export default function Home() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 直接设为false，不等待
 
   useEffect(() => {
-    async function checkAuth() {
-      try {
-        const userData = await getCurrentUser();
+    // 异步获取用户信息，不阻塞页面渲染
+    getCurrentUser()
+      .then(userData => {
         setUser(userData);
-      } catch (error) {
-        // 未登录
+      })
+      .catch(() => {
+        // 静默失败
         setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    checkAuth();
+      });
   }, []);
-
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>加载中...</div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -86,6 +75,13 @@ export default function Home() {
               <span>聊天室</span>
             </button>
             <button
+              className={`${styles.tab} ${activeTab === 'signals' ? styles.active : ''}`}
+              onClick={() => setActiveTab('signals')}
+            >
+              <span className={styles.tabIcon}>📢</span>
+              <span>信号列表</span>
+            </button>
+            <button
               className={`${styles.tab} ${activeTab === 'home' ? styles.active : ''}`}
               onClick={() => setActiveTab('home')}
             >
@@ -105,7 +101,13 @@ export default function Home() {
         <main className={styles.main}>
           {activeTab === 'chat' && (
             <div className={styles.tabContent}>
-              <ChatBox />
+              <ChatBox filterSource="exclude_tradingview" title="聊天室" />
+            </div>
+          )}
+
+          {activeTab === 'signals' && (
+            <div className={styles.tabContent}>
+              <ChatBox filterSource="tradingview" title="信号列表" />
             </div>
           )}
 

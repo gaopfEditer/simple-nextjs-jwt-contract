@@ -77,6 +77,12 @@ app.prepare().then(() => {
       const parsedUrl = parse(req.url, true);
       const pathname = parsedUrl.pathname;
       
+      // Next.js 热更新相关路径，直接交给 Next.js 处理
+      if (pathname?.startsWith('/_next/')) {
+        await handle(req, res, parsedUrl);
+        return;
+      }
+      
       // 处理 HTTP 推送接口（用于 AutoJS 等客户端发送消息）
       if (pathname === '/push' && req.method === 'POST') {
         let body = '';
@@ -242,12 +248,7 @@ app.prepare().then(() => {
       }
       
       // 其他请求交给 Next.js 处理
-      // 如果是 API 路由，记录一下（用于调试）
-      if (pathname?.startsWith('/api/')) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[路由转发] ${req.method} ${pathname} -> Next.js`);
-        }
-      }
+      // Next.js 开发模式的热更新 WebSocket 会自动处理
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -256,10 +257,32 @@ app.prepare().then(() => {
     }
   });
 
-  // 创建 WebSocket 服务器
-  const wss = new WebSocket.Server({ 
-    server,
-    path: '/api/ws'
+  // 创建 WebSocket 服务器（手动处理，确保不影响 Next.js 热更新）
+  const wss = new WebSocket.Server({ noServer: true });
+  
+  // 处理 WebSocket 升级请求
+  // 注意：必须在 server.listen() 之前设置，但要在 server 创建之后
+  server.on('upgrade', (request, socket, head) => {
+    const { pathname } = parse(request.url);
+    
+    // 只处理 /api/ws，其他路径（包括 Next.js 的 /_next/webpack-hmr）不拦截
+    if (pathname === '/api/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      // Next.js 的 HMR 使用 EventSource (SSE)，不是 WebSocket
+      // 所以这里不会收到 Next.js HMR 的 WebSocket 升级请求
+      // 但为了安全，对于 /_next/ 路径的请求，我们不拦截
+      if (pathname?.startsWith('/_next/')) {
+        // Next.js 的内部路径，不处理（Next.js 会通过 HTTP 处理）
+        socket.destroy();
+        return;
+      }
+      
+      // 其他未知的 WebSocket 请求，销毁连接
+      socket.destroy();
+    }
   });
 
   // 存储所有连接的客户端
@@ -501,7 +524,9 @@ app.prepare().then(() => {
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('收到消息:', data);
+        if(data.type !== "pong") {
+          console.log('收到消息:', data);
+        }
         
         const clientInfo = clients.get(ws);
         if (!clientInfo) {
@@ -901,11 +926,6 @@ app.prepare().then(() => {
     }
   }
 
-  // 定期检查并转发未转发的消息（每1秒检查一次，确保消息及时转发）
-  setInterval(() => {
-    checkAndForwardMessages();
-  }, 1000); // 每1秒检查一次
-
   // 定期清理不活跃的 HTTP 客户端（超过 5 分钟没有轮询）
   setInterval(() => {
     const now = Date.now();
@@ -955,6 +975,9 @@ app.prepare().then(() => {
     }
   }, 60000); // 每分钟检查一次
 
+  // 先启动服务器，再初始化其他功能
+  console.log(`> 正在尝试监听端口 ${port}...`);
+  
   server
     .once('error', (err) => {
       console.error('> ❌ 服务器启动错误:', err);
@@ -970,14 +993,20 @@ app.prepare().then(() => {
       console.log(`> ✅ TradingView API: http://${hostname}:${port}/api/tradingview/receive`);
       console.log(`> ✅ 服务器正在监听端口 ${port}，等待请求...`);
       
+      // 服务器启动后初始化数据库连接池
+      getDbPool();
+      
+      // 定期检查并转发未转发的消息（每1秒检查一次，确保消息及时转发）
+      setInterval(() => {
+        checkAndForwardMessages();
+      }, 1000); // 每1秒检查一次
+      
       // 服务器启动后立即检查一次未转发的消息
       setTimeout(() => {
         console.log('> 检查未转发的消息...');
         checkAndForwardMessages();
       }, 2000); // 延迟2秒，确保数据库连接已建立
     });
-  
-  console.log(`> 正在尝试监听端口 ${port}...`);
 }).catch((err) => {
   console.error('> ❌ Next.js 应用准备失败:', err);
   process.exit(1);

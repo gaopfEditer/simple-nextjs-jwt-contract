@@ -165,7 +165,7 @@ export default async function handler(
 
     // 立即触发消息转发（异步，不阻塞响应）
     try {
-      const port = process.env.PORT || 3000;
+      const port = process.env.PORT || 3123;
       const messageData = JSON.stringify({
         id: savedMessage.id,
         source: savedMessage.source,

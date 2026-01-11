@@ -20,7 +20,12 @@ interface WebSocketMessage {
   timestamp: string;
 }
 
-export default function ChatBox() {
+interface ChatBoxProps {
+  filterSource?: 'tradingview' | 'exclude_tradingview' | null;
+  title?: string;
+}
+
+export default function ChatBox({ filterSource = null, title = '消息中心' }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('未连接');
@@ -31,6 +36,12 @@ export default function ChatBox() {
   const reconnectAttemptsRef = useRef<number>(0);
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
+
+  // 使用 useRef 保存 filterSource，避免重复连接
+  const filterSourceRef = useRef(filterSource);
+  useEffect(() => {
+    filterSourceRef.current = filterSource;
+  }, [filterSource]);
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -86,17 +97,29 @@ export default function ChatBox() {
 
           // 处理收到的消息
           if (data.type === 'message_received' && data.message) {
-            console.log('[WebSocket] ✅ 收到消息:', data.message);
+            // 根据filterSource过滤消息（使用ref获取最新值）
+            const currentFilter = filterSourceRef.current;
+            let shouldShow = true;
+            if (currentFilter === 'tradingview') {
+              // 只显示 tradingview 来源的消息
+              shouldShow = data.message.source === 'tradingview' || data.message.type === 'trading_signal';
+            } else if (currentFilter === 'exclude_tradingview') {
+              // 排除 tradingview 来源的消息
+              shouldShow = data.message.source !== 'tradingview' && data.message.type !== 'trading_signal';
+            }
+            
+            if (!shouldShow) {
+              return;
+            }
+            
             setMessages((prev) => {
               // 避免重复消息
               const exists = prev.some(msg => msg.id === data.message!.id);
               if (exists) {
-                console.log('[WebSocket] ⚠️ 消息已存在，跳过:', data.message!.id);
                 return prev;
               }
               // 最多保留500条消息
               const newMessages = [...prev, data.message!];
-              console.log('[WebSocket] ✅ 添加新消息，当前消息数:', newMessages.length);
               return newMessages.slice(-500);
             });
           } else {
@@ -181,6 +204,7 @@ export default function ChatBox() {
   const getSourceName = (source: string) => {
     const sourceMap: { [key: string]: string } = {
       'telegram': 'Telegram',
+      'tradingview': 'TradingView',
       'api': 'API',
       'webhook': 'Webhook',
       'system': '系统'
@@ -188,10 +212,51 @@ export default function ChatBox() {
     return sourceMap[source] || source;
   };
 
+  // 获取消息类型显示样式
+  const getMessageTypeStyle = (msg: Message) => {
+    if (msg.source === 'tradingview' || msg.type === 'trading_signal') {
+      return styles.tradingSignal;
+    }
+    return '';
+  };
+
+  // 渲染TradingView交易信号的特殊显示
+  const renderTradingViewMessage = (msg: Message) => {
+    if (msg.source !== 'tradingview' && msg.type !== 'trading_signal') {
+      return null;
+    }
+
+    const metadata = msg.metadata || {};
+    const ticker = metadata.ticker || 'N/A';
+    const close = metadata.close;
+    const time = metadata.time;
+
+    return (
+      <div className={styles.tradingViewInfo}>
+        <div className={styles.tickerBadge}>
+          <span className={styles.tickerLabel}>交易对:</span>
+          <span className={styles.tickerValue}>{ticker}</span>
+        </div>
+        {close !== null && close !== undefined && (
+          <div className={styles.priceBadge}>
+            <span className={styles.priceLabel}>价格:</span>
+            <span className={styles.priceValue}>{close.toLocaleString()}</span>
+          </div>
+        )}
+        {time && (
+          <div className={styles.timeBadge}>
+            <span className={styles.timeLabel}>时间:</span>
+            <span className={styles.timeValue}>{new Date(time).toLocaleString('zh-CN')}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={styles.chatContainer}>
       <div className={styles.chatHeader}>
-        <h2>消息中心</h2>
+        <h2>{title}</h2>
         <div className={styles.status}>
           <span className={`${styles.statusIndicator} ${isConnected ? styles.connected : styles.disconnected}`}>
             {isConnected ? '●' : '○'}
@@ -214,7 +279,7 @@ export default function ChatBox() {
           </div>
         ) : (
           messages.map((msg) => (
-            <div key={msg.id} className={styles.messageItem}>
+            <div key={msg.id} className={`${styles.messageItem} ${getMessageTypeStyle(msg)}`}>
               <div className={styles.messageHeader}>
                 <span className={styles.messageSource}>
                   {getSourceName(msg.source)}
@@ -233,6 +298,8 @@ export default function ChatBox() {
                   {msg.title}
                 </div>
               )}
+              {/* TradingView交易信号特殊显示 */}
+              {renderTradingViewMessage(msg)}
               <div className={styles.messageContent}>
                 {msg.content}
               </div>

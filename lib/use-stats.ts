@@ -40,12 +40,13 @@ export function useTrackVisit(path?: string) {
         });
       } catch (error) {
         // 静默失败，不影响用户体验
-        console.error('跟踪访问失败:', error);
+        // console.error('跟踪访问失败:', error);
       }
     };
 
     trackVisit();
-  }, [path, currentSiteId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]); // 移除 currentSiteId 依赖，避免无限循环
 }
 
 /**
