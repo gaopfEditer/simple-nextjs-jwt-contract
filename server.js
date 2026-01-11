@@ -68,6 +68,10 @@ function getDbPool() {
 }
 
 app.prepare().then(() => {
+  console.log('> Next.js 应用已准备就绪');
+  console.log('> API 路由已加载，可以接收请求');
+  console.log(`> 准备启动服务器，端口: ${port}, 主机: ${hostname}`);
+  
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
@@ -238,6 +242,12 @@ app.prepare().then(() => {
       }
       
       // 其他请求交给 Next.js 处理
+      // 如果是 API 路由，记录一下（用于调试）
+      if (pathname?.startsWith('/api/')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[路由转发] ${req.method} ${pathname} -> Next.js`);
+        }
+      }
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -748,25 +758,29 @@ app.prepare().then(() => {
 
     let forwardedCount = 0;
     const messageJson = JSON.stringify(messageData);
+    
+    // 判断是否是测试消息（减少日志输出）
+    const isTestMessage = message.sender === 'test_user' || message.content === '这是一条测试消息';
 
-    console.log(`[WebSocket转发] 准备转发消息，当前WebSocket客户端数: ${clients.size}`);
-    console.log(`[WebSocket转发] 消息数据:`, JSON.stringify(messageData, null, 2));
+    // 只在有客户端连接时输出详细日志
+    if (clients.size > 0 || httpClients.size > 0) {
+      if (!isTestMessage) {
+        console.log(`[WebSocket转发] 准备转发消息，当前WebSocket客户端数: ${clients.size}`);
+      }
+    }
 
     // 转发给所有WebSocket客户端
     clients.forEach((clientInfo, ws) => {
-      const state = ws.readyState;
-      console.log(`[WebSocket转发] 客户端 ${clientInfo.id} 状态: ${state} (OPEN=${WebSocket.OPEN})`);
-      
       if (ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(messageJson);
           forwardedCount++;
-          console.log(`[WebSocket转发] 消息已发送到客户端 ${clientInfo.id}`);
+          if (!isTestMessage) {
+            console.log(`[WebSocket转发] 消息已发送到客户端 ${clientInfo.id}`);
+          }
         } catch (error) {
           console.error(`[WebSocket转发] 转发消息到WebSocket客户端失败 (${clientInfo.id}):`, error);
         }
-      } else {
-        console.log(`[WebSocket转发] 跳过客户端 ${clientInfo.id}，状态不是OPEN (${state})`);
       }
     });
 
@@ -780,7 +794,7 @@ app.prepare().then(() => {
       }
     });
 
-    if (forwardedCount > 0) {
+    if (forwardedCount > 0 && !isTestMessage) {
       console.log(`[WebSocket转发] 消息已转发给 ${forwardedCount} 个客户端:`, {
         id: message.id,
         source: message.source,
@@ -818,10 +832,30 @@ app.prepare().then(() => {
         return;
       }
 
-      console.log(`[消息转发] 发现 ${rows.length} 条未转发的消息，开始转发...`);
-
+      // 过滤掉测试消息，减少日志输出
+      const testMessages = rows.filter(row => row.sender === 'test_user' || row.content === '这是一条测试消息');
+      const normalMessages = rows.filter(row => row.sender !== 'test_user' && row.content !== '这是一条测试消息');
+      
+      if (normalMessages.length > 0) {
+        console.log(`[消息转发] 发现 ${normalMessages.length} 条未转发的消息，开始转发...`);
+      }
+      
+      // 对于测试消息，如果没有客户端连接，直接标记为已转发（避免重复尝试）
+      const hasClients = clients.size > 0 || httpClients.size > 0;
+      
       for (const row of rows) {
         try {
+          const isTestMessage = row.sender === 'test_user' || row.content === '这是一条测试消息';
+          
+          // 如果是测试消息且没有客户端连接，直接标记为已转发
+          if (isTestMessage && !hasClients) {
+            await pool.execute(
+              'UPDATE messages SET forwarded = 1 WHERE id = ?',
+              [row.id]
+            );
+            continue;
+          }
+          
           // 解析metadata（如果是JSON字符串）
           let metadata = row.metadata;
           if (metadata && typeof metadata === 'string') {
@@ -848,13 +882,11 @@ app.prepare().then(() => {
           // 转发消息
           const forwardedCount = await forwardMessageToClients(message);
         
-          // 标记为已转发
-          if (forwardedCount > 0) {
-            await pool.execute(
-              'UPDATE messages SET forwarded = 1 WHERE id = ?',
-              [row.id]
-            );
-          }
+          // 标记为已转发（即使没有客户端连接，也标记为已转发，避免重复尝试）
+          await pool.execute(
+            'UPDATE messages SET forwarded = 1 WHERE id = ?',
+            [row.id]
+          );
         } catch (error) {
           console.error(`转发消息失败 (ID: ${row.id}):`, error);
         }
@@ -925,13 +957,18 @@ app.prepare().then(() => {
 
   server
     .once('error', (err) => {
-      console.error(err);
+      console.error('> ❌ 服务器启动错误:', err);
+      if (err.code === 'EADDRINUSE') {
+        console.error(`> 端口 ${port} 已被占用，请使用其他端口或关闭占用该端口的进程`);
+      }
       process.exit(1);
     })
-    .listen(port, async () => {
-      console.log(`> 服务器已启动: http://${hostname}:${port}`);
-      console.log(`> WebSocket 服务器已启动: ws://${hostname}:${port}/api/ws`);
-      console.log(`> 消息API: http://${hostname}:${port}/api/messages/receive`);
+    .listen(port, hostname, async () => {
+      console.log(`> ✅ 服务器已启动: http://${hostname}:${port}`);
+      console.log(`> ✅ WebSocket 服务器已启动: ws://${hostname}:${port}/api/ws`);
+      console.log(`> ✅ 消息API: http://${hostname}:${port}/api/messages/receive`);
+      console.log(`> ✅ TradingView API: http://${hostname}:${port}/api/tradingview/receive`);
+      console.log(`> ✅ 服务器正在监听端口 ${port}，等待请求...`);
       
       // 服务器启动后立即检查一次未转发的消息
       setTimeout(() => {
@@ -939,5 +976,10 @@ app.prepare().then(() => {
         checkAndForwardMessages();
       }, 2000); // 延迟2秒，确保数据库连接已建立
     });
+  
+  console.log(`> 正在尝试监听端口 ${port}...`);
+}).catch((err) => {
+  console.error('> ❌ Next.js 应用准备失败:', err);
+  process.exit(1);
 });
 
