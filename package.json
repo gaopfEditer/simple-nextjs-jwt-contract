@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_ENV=development node server.js",
-    "dev:build": "next build && cross-env NODE_ENV=development node server.js",
+    "dev": "cross-env NODE_ENV=development PORT=3123 node server.js",
+    "dev:build": "next build && cross-env NODE_ENV=development PORT=3123 node server.js",
     "build": "next build",
     "start": "cross-env NODE_ENV=production node server.js",
     "lint": "next lint"
