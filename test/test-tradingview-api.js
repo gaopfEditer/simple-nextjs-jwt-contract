@@ -1,5 +1,7 @@
 // Node.js 脚本：测试 TradingView API
+const https = require('https');
 const http = require('http');
+const { URL } = require('url');
 
 const data = JSON.stringify({
   ticker: 'BTCUSDT',
@@ -8,16 +10,47 @@ const data = JSON.stringify({
   message: 'BTCUSDT 上插针 | 2024-01-15T10:30:00Z | 价格:45000.5 | 15M@45100+1H@45200'
 });
 
-// 从环境变量读取端口，默认为3000
-// 也可以通过命令行参数指定: PORT=3123 node test/test-tradingview-api.js
-const port = process.env.PORT || 3123;
+// 设置 isLocal 变量
+// 可以通过环境变量 IS_LOCAL 控制
+// true = 本地测试 (http://localhost:3123) - 默认值
+// false = 生产服务器 (https://bz.a.gaopf.top)
+// 使用方式:
+//   IS_LOCAL=true node test/test-tradingview-api.js   # 本地测试
+//   IS_LOCAL=false node test/test-tradingview-api.js  # 生产服务器
+const isLocal = false;
 
-console.log('提示: 如果服务器运行在其他端口，请设置环境变量 PORT=端口号');
+// 根据 isLocal 选择目标 URL
+const targetUrl = process.env.URL || (isLocal 
+  ? 'http://localhost:3123' 
+  : 'https://bz.a.gaopf.top/api/tradingview/receive');
 
+console.log('🚀 TradingView API 测试工具');
+console.log('================================');
+console.log('测试模式:', isLocal ? '本地测试' : '生产服务器');
+console.log('提示: 可以通过环境变量控制');
+console.log('  IS_LOCAL=true  - 使用本地测试 (http://localhost:3123)');
+console.log('  IS_LOCAL=false - 使用生产服务器 (https://bz.a.gaopf.top)');
+console.log('  或直接设置 URL 环境变量指定地址');
+console.log('');
+
+// 解析 URL
+let url;
+try {
+  url = new URL(targetUrl);
+} catch (error) {
+  console.error('❌ URL 格式错误:', targetUrl);
+  console.error('   正确格式: http://hostname:port 或 https://hostname:port');
+  process.exit(1);
+}
+
+const isHttps = url.protocol === 'https:';
+const httpModule = isHttps ? https : http;
+
+// 构建请求选项
 const options = {
-  hostname: 'localhost',
-  port: parseInt(port, 10),
-  path: '/api/tradingview/receive',
+  hostname: url.hostname,
+  port: url.port || (isHttps ? 443 : 80),
+  path: url.pathname || '/api/tradingview/receive',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -26,14 +59,29 @@ const options = {
   timeout: 10000
 };
 
-console.log('发送请求到:', `http://${options.hostname}:${options.port}${options.path}`);
-console.log('请求数据:', data);
+// 如果是 HTTPS 且使用自签名证书，可能需要禁用证书验证（仅用于测试）
+if (isHttps && process.env.REJECT_UNAUTHORIZED === 'false') {
+  options.rejectUnauthorized = false;
+  console.warn('⚠️  警告: SSL 证书验证已禁用（仅用于测试）');
+}
 
-const req = http.request(options, (res) => {
+// 构建显示用的 URL（默认端口不显示）
+const displayPort = (isHttps && options.port === 443) || (!isHttps && options.port === 80)
+  ? ''
+  : `:${options.port}`;
+const displayUrl = `${url.protocol}//${options.hostname}${displayPort}${options.path}`;
+
+console.log('📤 发送请求...');
+console.log('   目标地址:', displayUrl);
+console.log('   请求数据:', data);
+console.log('');
+
+const req = httpModule.request(options, (res) => {
   let responseData = '';
 
-  console.log('\n状态码:', res.statusCode);
-  console.log('响应头:', res.headers);
+  console.log('📥 收到响应');
+  console.log('   状态码:', res.statusCode);
+  console.log('   状态消息:', res.statusMessage);
 
   res.on('data', (chunk) => {
     responseData += chunk;
@@ -42,20 +90,24 @@ const req = http.request(options, (res) => {
   res.on('end', () => {
     // 根据状态码判断是否成功
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      console.log(`\n✅ 请求成功！状态码: ${res.statusCode}`);
+      console.log('✅ 请求成功！');
+      console.log('   状态码:', res.statusCode);
       try {
         const parsed = JSON.parse(responseData);
-        console.log('响应数据:', JSON.stringify(parsed, null, 2));
+        console.log('   响应数据:', JSON.stringify(parsed, null, 2));
       } catch (e) {
-        console.log('响应数据（原始）:', responseData);
+        console.log('   响应数据（原始）:', responseData);
       }
+      console.log('');
+      console.log('✨ 测试完成');
     } else {
-      console.error(`\n❌ 请求失败！状态码: ${res.statusCode}`);
+      console.error('❌ 请求失败！');
+      console.error('   状态码:', res.statusCode);
       try {
         const parsed = JSON.parse(responseData);
-        console.error('错误响应:', JSON.stringify(parsed, null, 2));
+        console.error('   错误响应:', JSON.stringify(parsed, null, 2));
       } catch (e) {
-        console.error('错误响应（原始）:', responseData);
+        console.error('   错误响应（原始）:', responseData);
       }
       process.exit(1);
     }
@@ -63,23 +115,39 @@ const req = http.request(options, (res) => {
 });
 
 req.on('error', (error) => {
-  console.error('\n❌ 请求失败！');
-  console.error('错误:', error.message);
+  console.error('❌ 请求失败！');
+  console.error('   错误:', error.message);
+  console.error('   错误代码:', error.code);
+  console.error('');
   console.error('可能的原因:');
-  console.error('  1. 服务器未运行 (请运行: npm run dev 或 pnpm dev)');
-  console.error('  2. 端口不正确');
+  console.error('  1. 服务器未运行');
+  console.error('  2. URL 或端口不正确');
   console.error('  3. 网络连接问题');
+  console.error('  4. SSL 证书问题（如果是 HTTPS）');
+  console.error('  5. 防火墙阻止连接');
+  if (isHttps && error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+    console.error('');
+    console.error('提示: 如果是自签名证书，可以设置:');
+    console.error('  REJECT_UNAUTHORIZED=false node test/test-tradingview-api.js');
+  }
+  process.exit(1);
 });
 
 req.on('timeout', () => {
-  console.error('\n❌ 请求超时！');
+  console.error('❌ 请求超时！');
+  console.error('   超时时间: 10 秒');
   req.destroy();
+  process.exit(1);
 });
 
 req.setTimeout(10000, () => {
   req.destroy();
 });
 
+// 发送请求
 req.write(data);
 req.end();
+
+console.log('⏳ 等待响应...');
+console.log('');
 

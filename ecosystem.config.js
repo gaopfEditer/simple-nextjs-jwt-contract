@@ -43,11 +43,11 @@ module.exports = {
       // 数据库配置（生产环境应从 .env.local 读取）
       DB_HOST: 'localhost',
       DB_PORT: '3306',
-      DB_USER: 'nextjs_user',
-      DB_PASSWORD: '',               // 应从环境变量读取
+      DB_USER: 'root',
+      DB_PASSWORD: 'b01c044f2e0bf36e',               // 应从环境变量读取
       DB_NAME: 'nextjs_jwt',
       // JWT 配置
-      JWT_SECRET: '',               // 必须从环境变量设置
+      JWT_SECRET: "Zrs.abR)C7+JYw%|8PS&;hh8+Mdj3+-8m9ixI5lx,5q#%jJlP45o1TY6kNeyXCT/",               // 必须从环境变量设置
       JWT_EXPIRES_IN: '7d',
     }
   }]

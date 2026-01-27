@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 只在生产模式使用 standalone，开发模式禁用以支持热更新
-  ...(process.env.NODE_ENV === 'production' ? { output: 'standalone' } : {}),
+  // 禁用 standalone 模式（因为使用自定义 server.js）
+  // standalone 模式用于 Docker 等容器环境，PM2 部署不需要
+  // ...(process.env.NODE_ENV === 'production' ? { output: 'standalone' } : {}),
 }
 
 module.exports = nextConfig
