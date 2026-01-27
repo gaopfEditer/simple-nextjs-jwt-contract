@@ -6,10 +6,13 @@ import http from 'http';
 // 扩展NextApiRequest以包含TradingView数据
 interface TradingViewRequest extends NextApiRequest {
   body: {
-    ticker: string;
-    time: string;
-    close: number;
-    message: string;
+    // 新格式：支持以 ; 分隔的数据和描述
+    // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
+    message?: string; // 完整消息（包含数据和描述，以 ; 分隔）
+    // 兼容旧格式
+    ticker?: string;
+    time?: string;
+    close?: number;
   };
 }
 
@@ -22,13 +25,23 @@ interface TradingViewRequest extends NextApiRequest {
  * 请求头：
  * - Content-Type: application/json
  * 
- * Body示例:
+ * 新格式（推荐）:
+ * {
+ *   "message": "BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900"
+ * }
+ * 
+ * 旧格式（兼容）:
  * {
  *   "ticker": "BTCUSDT",
  *   "time": "2024-01-15T10:30:00Z",
  *   "close": 45000.5,
  *   "message": "BTCUSDT 上插针 | 2024-01-15T10:30:00Z | 价格:45000.5 | 15M@45100+1H@45200"
  * }
+ * 
+ * 数据格式说明：
+ * - 以 ; 分隔，前面是数据部分，后面是描述部分
+ * - 数据部分格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}}
+ * - 描述部分：可选的描述信息
  */
 export default async function handler(
   req: TradingViewRequest,
@@ -69,34 +82,64 @@ export default async function handler(
       return res.status(400).json(errorResponse);
     }
 
-    const { ticker, time, close, message } = req.body;
+    const { message, ticker: oldTicker, time: oldTime, close: oldClose } = req.body;
+
+    // 解析数据
+    let ticker: string = oldTicker || 'UNKNOWN'; // 默认值
+    let type: string = 'trading_signal';
+    let time: string | null = oldTime || null;
+    let close: number | null = oldClose !== undefined ? oldClose : null;
+    let high: number | null = null;
+    let low: number | null = null;
+    let description: string = '';
+
+    // 优先使用新格式（message字段包含完整数据）
+    if (message && typeof message === 'string') {
+      // 检查是否包含 ; 分隔符（新格式）
+      if (message.includes(';')) {
+        const parts = message.split(';').map(s => s.trim());
+        const dataPart = parts[0]; // 数据部分
+        description = parts[1] || ''; // 描述部分（可选）
+
+        // 解析数据部分：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}}
+        const dataFields = dataPart.split('|').map(s => s.trim());
+        
+        if (dataFields.length >= 1 && dataFields[0]) ticker = dataFields[0];
+        if (dataFields.length >= 2 && dataFields[1]) type = dataFields[1];
+        if (dataFields.length >= 3 && dataFields[2]) time = dataFields[2];
+        if (dataFields.length >= 4 && dataFields[3]) {
+          const closeVal = parseFloat(dataFields[3]);
+          close = isNaN(closeVal) ? null : closeVal;
+        }
+        if (dataFields.length >= 5 && dataFields[4]) {
+          const highVal = parseFloat(dataFields[4]);
+          high = isNaN(highVal) ? null : highVal;
+        }
+        if (dataFields.length >= 6 && dataFields[5]) {
+          const lowVal = parseFloat(dataFields[5]);
+          low = isNaN(lowVal) ? null : lowVal;
+        }
+      } else {
+        // 旧格式：只有 message，没有数据部分
+        description = message;
+        // 如果旧格式字段存在，使用它们
+        if (oldTicker) ticker = oldTicker;
+        if (oldTime) time = oldTime;
+        if (oldClose !== undefined) close = oldClose;
+      }
+    } else {
+      // 完全使用旧格式
+      if (oldTicker) ticker = oldTicker;
+      if (oldTime) time = oldTime;
+      if (oldClose !== undefined) close = oldClose;
+      description = message || '';
+    }
 
     // 验证必需字段
     if (!ticker || typeof ticker !== 'string') {
       const errorResponse = {
         error: 'Bad request',
-        message: 'ticker字段不能为空且必须是字符串',
-        received: req.body
-      };
-      logApiResponse('/api/tradingview/receive', 400, errorResponse);
-      return res.status(400).json(errorResponse);
-    }
-
-    if (!message || typeof message !== 'string') {
-      const errorResponse = {
-        error: 'Bad request',
-        message: 'message字段不能为空且必须是字符串',
-        received: req.body
-      };
-      logApiResponse('/api/tradingview/receive', 400, errorResponse);
-      return res.status(400).json(errorResponse);
-    }
-
-    // 验证close字段（如果存在，必须是数字）
-    if (close !== undefined && (typeof close !== 'number' || isNaN(close))) {
-      const errorResponse = {
-        error: 'Bad request',
-        message: 'close字段必须是有效数字',
+        message: 'ticker字段不能为空且必须是字符串（可以从message中解析或直接提供）',
         received: req.body
       };
       logApiResponse('/api/tradingview/receive', 400, errorResponse);
@@ -110,32 +153,40 @@ export default async function handler(
       req.socket.remoteAddress ||
       undefined;
 
-    // 构建消息标题（使用ticker和时间）
-    const title = `${ticker} 交易信号`;
+    // 构建消息标题（使用ticker和信号类型）
+    const title = `${ticker} ${type || '交易信号'}`;
     
-    // 构建完整的消息内容
-    let content = message;
-    if (close !== undefined) {
-      content = `${message}\n价格: ${close}`;
-    }
-    if (time) {
-      content = `${content}\n时间: ${time}`;
+    // 构建完整的消息内容（使用描述部分，如果没有则自动生成）
+    let content = description;
+    if (!content) {
+      // 如果没有描述，自动生成
+      const parts: string[] = [];
+      if (ticker) parts.push(ticker);
+      if (type) parts.push(type);
+      if (time) parts.push(`时间: ${time}`);
+      if (close !== null) parts.push(`价格: ${close}`);
+      if (high !== null) parts.push(`最高: ${high}`);
+      if (low !== null) parts.push(`最低: ${low}`);
+      content = parts.join(' | ');
     }
 
     // 构建metadata，保存TradingView的原始数据
-    const metadata = {
+    const metadata: any = {
       source: 'tradingview',
       ticker,
+      type: type || 'trading_signal',
       time,
-      close: close !== undefined ? close : null,
-      original_message: message
+      close,
+      high,
+      low,
+      original_message: message || req.body.message || ''
     };
 
     // 创建消息记录
     const savedMessage = await createMessage({
       source: 'tradingview',
-      source_id: `${ticker}_${time || Date.now()}`,
-      type: 'trading_signal',
+      source_id: `${ticker}_${time || Date.now()}_${type || 'signal'}`,
+      type: type || 'trading_signal', // 使用解析出的信号类型
       title,
       content,
       metadata,
@@ -152,8 +203,11 @@ export default async function handler(
       data: {
         id: savedMessage.id,
         ticker,
+        type: type || 'trading_signal',
         time,
         close,
+        high,
+        low,
         created_at: savedMessage.created_at
       }
     };

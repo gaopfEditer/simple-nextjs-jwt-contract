@@ -3,12 +3,23 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-const data = JSON.stringify({
+// 新格式测试数据（推荐）
+// 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
+const newFormatData = JSON.stringify({
+  message: 'BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900'
+});
+
+// 旧格式测试数据（兼容）
+const oldFormatData = JSON.stringify({
   ticker: 'BTCUSDT',
   time: '2024-01-15T10:30:00Z',
   close: 45000.5,
   message: 'BTCUSDT 上插针 | 2024-01-15T10:30:00Z | 价格:45000.5 | 15M@45100+1H@45200'
 });
+
+// 使用新格式（可以通过环境变量 TEST_FORMAT=old 切换到旧格式）
+const useNewFormat = process.env.TEST_FORMAT !== 'old';
+const data = useNewFormat ? newFormatData : oldFormatData;
 
 // 设置 isLocal 变量
 // 可以通过环境变量 IS_LOCAL 控制
@@ -27,9 +38,12 @@ const targetUrl = process.env.URL || (isLocal
 console.log('🚀 TradingView API 测试工具');
 console.log('================================');
 console.log('测试模式:', isLocal ? '本地测试' : '生产服务器');
+console.log('数据格式:', useNewFormat ? '新格式（推荐）' : '旧格式（兼容）');
 console.log('提示: 可以通过环境变量控制');
 console.log('  IS_LOCAL=true  - 使用本地测试 (http://localhost:3123)');
 console.log('  IS_LOCAL=false - 使用生产服务器 (https://bz.a.gaopf.top)');
+console.log('  TEST_FORMAT=new - 使用新格式（默认）');
+console.log('  TEST_FORMAT=old - 使用旧格式');
 console.log('  或直接设置 URL 环境变量指定地址');
 console.log('');
 
