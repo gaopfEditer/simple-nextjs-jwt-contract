@@ -41,7 +41,7 @@ module.exports = {
       PORT: 3000,
       HOSTNAME: '0.0.0.0',          // 监听所有网络接口
       // 数据库配置（生产环境应从 .env.local 读取）
-      DB_HOST: 'localhost',
+      DB_HOST: '60.205.120.196',
       DB_PORT: '3306',
       DB_USER: 'root',
       DB_PASSWORD: 'b01c044f2e0bf36e',               // 应从环境变量读取
