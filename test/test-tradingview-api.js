@@ -28,11 +28,11 @@ const data = useNewFormat ? newFormatData : oldFormatData;
 // 使用方式:
 //   IS_LOCAL=true node test/test-tradingview-api.js   # 本地测试
 //   IS_LOCAL=false node test/test-tradingview-api.js  # 生产服务器
-const isLocal = false;
+const isLocal = true;
 
 // 根据 isLocal 选择目标 URL
 const targetUrl = process.env.URL || (isLocal 
-  ? 'http://localhost:3123' 
+  ? 'http://localhost:3123/api/tradingview/receive' 
   : 'https://bz.a.gaopf.top/api/tradingview/receive');
 
 console.log('🚀 TradingView API 测试工具');
@@ -87,6 +87,7 @@ const displayUrl = `${url.protocol}//${options.hostname}${displayPort}${options.
 
 console.log('📤 发送请求...');
 console.log('   目标地址:', displayUrl);
+console.log('   完整路径:', options.path);
 console.log('   请求数据:', data);
 console.log('');
 
