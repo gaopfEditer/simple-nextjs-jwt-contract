@@ -4,12 +4,52 @@
 const https = require('https');
 const { URL } = require('url');
 
-const data = JSON.stringify({
+// ============================================
+// 测试数据配置
+// ============================================
+
+// 新格式测试数据（推荐）
+// 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
+const testDataList = [
+  // 测试数据 1: RSI超买信号
+  {
+    message: 'BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900'
+  },
+  // 测试数据 2: RSI超卖信号
+  {
+    message: 'ETHUSDT | RSI超卖 | 2024-01-15T11:00:00Z | 2800.5 | 2810 | 2795 ; ETHUSDT RSI超卖 | 时间:2024-01-15T11:00:00Z | 价格:2800.5 | 最高:2810 | 最低:2795'
+  },
+  // 测试数据 3: MACD金叉
+  {
+    message: 'BTCUSDT | MACD金叉 | 2024-01-15T12:00:00Z | 45200 | 45300 | 45100 ; BTCUSDT MACD金叉 | 时间:2024-01-15T12:00:00Z | 价格:45200 | 最高:45300 | 最低:45100'
+  },
+  // 测试数据 4: 上插针信号
+  {
+    message: 'BTCUSDT | 上插针 | 2024-01-15T13:00:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT 上插针 | 时间:2024-01-15T13:00:00Z | 价格:45000.5 | 最高:45100 | 最低:44900'
+  },
+  // 测试数据 5: 使用当前时间
+  {
+    message: `BTCUSDT | 测试信号 | ${new Date().toISOString()} | 45000.5 | 45100 | 44900 ; BTCUSDT 测试信号 | 时间:${new Date().toISOString()} | 价格:45000.5 | 最高:45100 | 最低:44900`
+  }
+];
+
+// 旧格式测试数据（兼容）
+const oldFormatData = {
   ticker: 'BTCUSDT',
   time: new Date().toISOString(),
   close: 45000.5,
   message: 'BTCUSDT 上插针 | ' + new Date().toISOString() + ' | 价格:45000.5 | 15M@45100+1H@45200'
-});
+};
+
+// 选择测试数据
+// 可以通过环境变量 TEST_INDEX 选择测试数据（0-4），或 TEST_FORMAT=old 使用旧格式
+const useNewFormat = process.env.TEST_FORMAT !== 'old';
+const testIndex = parseInt(process.env.TEST_INDEX || '0', 10);
+const selectedData = useNewFormat 
+  ? testDataList[testIndex % testDataList.length] 
+  : oldFormatData;
+
+const data = JSON.stringify(selectedData);
 
 // 目标 URL（可以通过环境变量覆盖）
 const targetUrl = process.env.URL || 'https://bz.a.gaopf.top';
@@ -17,6 +57,11 @@ const targetUrl = process.env.URL || 'https://bz.a.gaopf.top';
 console.log('🚀 TradingView API 测试工具 (HTTPS)');
 console.log('================================');
 console.log('目标地址:', targetUrl);
+console.log('数据格式:', useNewFormat ? `新格式（测试数据 ${testIndex + 1}/${testDataList.length}）` : '旧格式（兼容）');
+console.log('提示: 可以通过环境变量控制');
+console.log('  TEST_FORMAT=old - 使用旧格式');
+console.log('  TEST_INDEX=0-4  - 选择新格式测试数据（默认0）');
+console.log('  URL=...         - 指定目标URL');
 console.log('');
 
 // 解析 URL
