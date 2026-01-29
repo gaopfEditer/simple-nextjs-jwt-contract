@@ -12,11 +12,8 @@ dayjs.extend(timezone);
 
 // 扩展NextApiRequest以包含TradingView数据
 interface TradingViewRequest extends NextApiRequest {
-  body: {
-    // 新格式：支持以 ; 分隔的数据和描述
-    // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
-    message: string; // 完整消息（包含数据和描述，以 ; 分隔）
-  };
+  body: string; // body 本身就是消息字符串
+  // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
 }
 
 /**
@@ -58,9 +55,7 @@ function convertToBeijingTime(utcTimeString: string | null): string | null {
  * - Content-Type: application/json
  * 
  * 请求格式:
- * {
- *   "message": "BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900"
- * }
+ * "BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900"
  * 
  * 数据格式说明：
  * - 以 ; 分隔，前面是数据部分，后面是描述部分
@@ -108,13 +103,14 @@ export default async function handler(
       return res.status(400).json(errorResponse);
     }
 
-    const { message } = req.body;
+    // body 本身就是消息字符串
+    const message = typeof req.body === 'string' ? req.body : String(req.body);
 
-    // 验证 message 字段
-    if (!message || typeof message !== 'string') {
+    // 验证 message 不为空
+    if (!message || message.trim() === '') {
       const errorResponse = {
         error: 'Bad request',
-        message: 'message字段不能为空且必须是字符串',
+        message: '请求体不能为空且必须是字符串',
         received: req.body
       };
       logApiResponse('/api/tradingview/receive', 400, errorResponse);
@@ -243,7 +239,7 @@ export default async function handler(
       close,
       high,
       low,
-      original_message: message || req.body.message || ''
+      original_message: message || ''
     };
 
     console.log('[准备创建消息]', {

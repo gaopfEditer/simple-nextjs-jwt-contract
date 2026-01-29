@@ -5,9 +5,7 @@ const { URL } = require('url');
 
 // 新格式测试数据（推荐）
 // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
-const newFormatData = JSON.stringify({
-  message: 'BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900'
-});
+const newFormatData = JSON.stringify('BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900');
 
 // 旧格式测试数据（兼容）
 const oldFormatData = JSON.stringify({
@@ -28,7 +26,7 @@ const data = useNewFormat ? newFormatData : oldFormatData;
 // 使用方式:
 //   IS_LOCAL=true node test/test-tradingview-api.js   # 本地测试
 //   IS_LOCAL=false node test/test-tradingview-api.js  # 生产服务器
-const isLocal = false;
+const isLocal = true;
 
 // 根据 isLocal 选择目标 URL
 const targetUrl = process.env.URL || (isLocal 
