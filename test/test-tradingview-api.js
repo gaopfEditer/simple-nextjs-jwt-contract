@@ -26,7 +26,7 @@ const data = useNewFormat ? newFormatData : oldFormatData;
 // 使用方式:
 //   IS_LOCAL=true node test/test-tradingview-api.js   # 本地测试
 //   IS_LOCAL=false node test/test-tradingview-api.js  # 生产服务器
-const isLocal = true;
+const isLocal = false;
 
 // 根据 isLocal 选择目标 URL
 const targetUrl = process.env.URL || (isLocal 
