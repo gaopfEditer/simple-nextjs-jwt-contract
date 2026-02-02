@@ -5,9 +5,10 @@ import Link from 'next/link';
 import ChatBox from '@/components/ChatBox';
 import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
+import GeminiChat from '@/components/GeminiChat';
 import styles from '../styles/HomePage.module.css';
 
-type TabType = 'chat' | 'signals' | 'home' | 'dashboard';
+type TabType = 'chat' | 'signals' | 'home' | 'dashboard' | 'gemini';
 
 export default function Home() {
   const router = useRouter();
@@ -94,6 +95,13 @@ export default function Home() {
             >
               <span className={styles.tabIcon}>📊</span>
               <span>仪表盘</span>
+            </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'gemini' ? styles.active : ''}`}
+              onClick={() => setActiveTab('gemini')}
+            >
+              <span className={styles.tabIcon}>🤖</span>
+              <span>Gemini</span>
             </button>
           </div>
         </div>
@@ -220,6 +228,12 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'gemini' && (
+            <div className={styles.tabContent}>
+              <GeminiChat />
             </div>
           )}
         </main>
