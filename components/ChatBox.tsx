@@ -43,6 +43,86 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
     filterSourceRef.current = filterSource;
   }, [filterSource]);
 
+  // 获取消息来源显示名称（需要在 sendMessageToTelegram 之前定义）
+  const getSourceName = (source: string) => {
+    const sourceMap: { [key: string]: string } = {
+      'telegram': 'Telegram',
+      'tradingview': 'TradingView',
+      'api': 'API',
+      'webhook': 'Webhook',
+      'system': '系统'
+    };
+    return sourceMap[source] || source;
+  };
+
+  // 发送消息到 Telegram 群组
+  const sendMessageToTelegram = async (message: Message) => {
+    try {
+      console.log('[Telegram] 📤 开始构建 Telegram 消息，消息 ID:', message.id);
+      
+      // 构建消息内容
+      let telegramMessage = '';
+      
+      // 如果有标题，添加标题
+      if (message.title) {
+        telegramMessage += `<b>${message.title}</b>\n\n`;
+      }
+      
+      // 添加消息内容
+      telegramMessage += message.content;
+      
+      // 如果是 TradingView 信号，添加额外信息
+      if (message.source === 'tradingview' || message.type === 'trading_signal') {
+        const metadata = message.metadata || {};
+        if (metadata.ticker) {
+          telegramMessage += `\n\n📊 <b>交易对:</b> ${metadata.ticker}`;
+        }
+        if (metadata.close !== null && metadata.close !== undefined) {
+          telegramMessage += `\n💰 <b>价格:</b> ${metadata.close.toLocaleString()}`;
+        }
+        if (metadata.time) {
+          telegramMessage += `\n⏰ <b>时间:</b> ${new Date(metadata.time).toLocaleString('zh-CN')}`;
+        }
+      }
+      
+      // 添加来源信息
+      const sourceName = getSourceName(message.source);
+      telegramMessage += `\n\n📌 <i>来源: ${sourceName}</i>`;
+      
+      console.log('[Telegram] 📝 消息内容已构建，长度:', telegramMessage.length);
+      console.log('[Telegram] 🌐 准备发送请求到 /api/telegram/send');
+      
+      // 发送到 Telegram API
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: telegramMessage,
+        }),
+      });
+
+      console.log('[Telegram] 📡 收到响应，状态:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[Telegram] ❌ 发送失败:', errorData);
+        return;
+      }
+
+      const result = await response.json();
+      console.log('[Telegram] ✅ 消息已发送到群组:', result);
+    } catch (error) {
+      // 输出详细错误信息
+      console.error('[Telegram] ❌ 发送消息时出错:', error);
+      console.error('[Telegram] 错误详情:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  };
+
   // 自动滚动到底部
   const scrollToBottom = () => {
     if (autoScrollRef.current && messagesEndRef.current) {
@@ -97,6 +177,13 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
 
           // 处理收到的消息
           if (data.type === 'message_received' && data.message) {
+            console.log('[ChatBox] ✅ 收到消息，准备处理:', {
+              id: data.message.id,
+              source: data.message.source,
+              type: data.message.type,
+              content: data.message.content?.substring(0, 50)
+            });
+
             // 根据filterSource过滤消息（使用ref获取最新值）
             const currentFilter = filterSourceRef.current;
             let shouldShow = true;
@@ -109,6 +196,11 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
             }
             
             if (!shouldShow) {
+              console.log('[ChatBox] ⚠️ 消息被过滤，不显示:', {
+                id: data.message.id,
+                filter: currentFilter,
+                source: data.message.source
+              });
               return;
             }
             
@@ -116,11 +208,19 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
               // 避免重复消息
               const exists = prev.some(msg => msg.id === data.message!.id);
               if (exists) {
+                console.log('[ChatBox] ⚠️ 消息已存在，跳过:', data.message!.id);
                 return prev;
               }
               // 最多保留500条消息
               const newMessages = [...prev, data.message!];
+              console.log('[ChatBox] ✅ 消息已添加到列表，当前消息数:', newMessages.length);
               return newMessages.slice(-500);
+            });
+
+            // 自动发送消息到 Telegram 群组
+            console.log('[ChatBox] 📤 准备发送消息到 Telegram，消息 ID:', data.message.id);
+            sendMessageToTelegram(data.message).catch((error) => {
+              console.error('[ChatBox] ❌ 发送到 Telegram 时出错:', error);
             });
           } else {
             // 调试：输出其他类型的消息
@@ -198,18 +298,6 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
   // 格式化完整时间
   const formatFullTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('zh-CN');
-  };
-
-  // 获取消息来源显示名称
-  const getSourceName = (source: string) => {
-    const sourceMap: { [key: string]: string } = {
-      'telegram': 'Telegram',
-      'tradingview': 'TradingView',
-      'api': 'API',
-      'webhook': 'Webhook',
-      'system': '系统'
-    };
-    return sourceMap[source] || source;
   };
 
   // 获取消息类型显示样式

@@ -38,8 +38,8 @@ module.exports = {
     // 生产环境配置
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3000,
-      HOSTNAME: '0.0.0.0',          // 监听所有网络接口
+      PORT: 3123,                   // 使用 3123 端口
+      HOSTNAME: '0.0.0.0',          // 监听所有网络接口（同时支持 IPv4 和 IPv6）
       // 数据库配置（生产环境应从 .env.local 读取）
       DB_HOST: '60.205.120.196',
       DB_PORT: '3306',

@@ -5,14 +5,14 @@ const { URL } = require('url');
 
 // 新格式测试数据（推荐）
 // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
-const newFormatData = JSON.stringify('BTCUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; BTCUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900');
+const newFormatData = JSON.stringify('MYXUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; MYXUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900');
 
 // 旧格式测试数据（兼容）
 const oldFormatData = JSON.stringify({
-  ticker: 'BTCUSDT',
+  ticker: 'MYXUSDT',
   time: '2024-01-15T10:30:00Z',
   close: 45000.5,
-  message: 'BTCUSDT 上插针 | 2024-01-15T10:30:00Z | 价格:45000.5 | 15M@45100+1H@45200'
+  message: 'MYXUSDT 上插针 | 2024-01-15T10:30:00Z | 价格:45000.5 | 15M@45100+1H@45200'
 });
 
 // 使用新格式（可以通过环境变量 TEST_FORMAT=old 切换到旧格式）

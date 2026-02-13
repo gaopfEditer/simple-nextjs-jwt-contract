@@ -765,71 +765,90 @@ app.prepare().then(() => {
 
   // 转发消息到所有WebSocket客户端
   async function forwardMessageToClients(message) {
-    const messageData = {
-      type: 'message_received',
-      message: {
-        id: message.id,
-        source: message.source,
-        source_id: message.source_id,
-        type: message.type,
-        title: message.title,
-        content: message.content,
-        metadata: message.metadata,
-        sender: message.sender,
-        sender_id: message.sender_id,
-        created_at: message.created_at
-      },
-      timestamp: new Date().toISOString()
-    };
+    try {
+      const messageData = {
+        type: 'message_received',
+        message: {
+          id: message.id,
+          source: message.source,
+          source_id: message.source_id,
+          type: message.type,
+          title: message.title,
+          content: message.content,
+          metadata: message.metadata,
+          sender: message.sender,
+          sender_id: message.sender_id,
+          created_at: message.created_at
+        },
+        timestamp: new Date().toISOString()
+      };
 
-    let forwardedCount = 0;
-    const messageJson = JSON.stringify(messageData);
-    
-    // 判断是否是测试消息（减少日志输出）
-    const isTestMessage = message.sender === 'test_user' || message.content === '这是一条测试消息';
+      let forwardedCount = 0;
+      const messageJson = JSON.stringify(messageData);
+      
+      // 判断是否是测试消息（减少日志输出）
+      const isTestMessage = message.sender === 'test_user' || message.content === '这是一条测试消息';
 
-    // 只在有客户端连接时输出详细日志
-    if (clients.size > 0 || httpClients.size > 0) {
-      if (!isTestMessage) {
-        console.log(`[WebSocket转发] 准备转发消息，当前WebSocket客户端数: ${clients.size}`);
-      }
-    }
-
-    // 转发给所有WebSocket客户端
-    clients.forEach((clientInfo, ws) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send(messageJson);
-          forwardedCount++;
-          if (!isTestMessage) {
-            console.log(`[WebSocket转发] 消息已发送到客户端 ${clientInfo.id}`);
-          }
-        } catch (error) {
-          console.error(`[WebSocket转发] 转发消息到WebSocket客户端失败 (${clientInfo.id}):`, error);
+      // 只在有客户端连接时输出详细日志
+      if (clients.size > 0 || httpClients.size > 0) {
+        if (!isTestMessage) {
+          console.log(`[WebSocket转发] 准备转发消息，当前WebSocket客户端数: ${clients.size}, HTTP客户端数: ${httpClients.size}`);
+        }
+      } else {
+        if (!isTestMessage) {
+          console.log(`[WebSocket转发] ⚠️ 没有客户端连接，消息无法转发`);
         }
       }
-    });
 
-    // 转发给所有HTTP客户端（放入消息队列）
-    httpClients.forEach((httpInfo, httpId) => {
-      try {
-        httpInfo.messageQueue.push(messageData);
-        forwardedCount++;
-      } catch (error) {
-        console.error(`转发消息到HTTP客户端失败 (${httpId}):`, error);
-      }
-    });
-
-    if (forwardedCount > 0 && !isTestMessage) {
-      console.log(`[WebSocket转发] 消息已转发给 ${forwardedCount} 个客户端:`, {
-        id: message.id,
-        source: message.source,
-        type: message.type,
-        content: message.content?.substring(0, 50)
+      // 转发给所有WebSocket客户端
+      clients.forEach((clientInfo, ws) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(messageJson);
+            forwardedCount++;
+            if (!isTestMessage) {
+              console.log(`[WebSocket转发] ✅ 消息已发送到 WebSocket 客户端 ${clientInfo.id}`);
+            }
+          } catch (error) {
+            console.error(`[WebSocket转发] ❌ 转发消息到WebSocket客户端失败 (${clientInfo.id}):`, error);
+          }
+        } else {
+          if (!isTestMessage) {
+            console.log(`[WebSocket转发] ⚠️ WebSocket 客户端 ${clientInfo.id} 连接状态: ${ws.readyState} (不是 OPEN)`);
+          }
+        }
       });
-    }
 
-    return forwardedCount;
+      // 转发给所有HTTP客户端（放入消息队列）
+      httpClients.forEach((httpInfo, httpId) => {
+        try {
+          httpInfo.messageQueue.push(messageData);
+          forwardedCount++;
+          if (!isTestMessage) {
+            console.log(`[WebSocket转发] ✅ 消息已添加到 HTTP 客户端 ${httpId} 的队列`);
+          }
+        } catch (error) {
+          console.error(`[WebSocket转发] ❌ 转发消息到HTTP客户端失败 (${httpId}):`, error);
+        }
+      });
+
+      if (forwardedCount > 0 && !isTestMessage) {
+        console.log(`[WebSocket转发] ✅ 消息已转发给 ${forwardedCount} 个客户端:`, {
+          id: message.id,
+          source: message.source,
+          type: message.type,
+          content: message.content?.substring(0, 50)
+        });
+      } else if (!isTestMessage) {
+        console.log(`[WebSocket转发] ⚠️ 消息未转发给任何客户端 (ID: ${message.id})`);
+      }
+
+      return forwardedCount;
+    } catch (error) {
+      console.error(`[WebSocket转发] ❌ forwardMessageToClients 函数出错:`, error);
+      console.error(`[WebSocket转发] 错误堆栈:`, error.stack);
+      return 0;
+    }
   }
 
   // 检查并转发未转发的消息
@@ -864,6 +883,7 @@ app.prepare().then(() => {
       
       if (normalMessages.length > 0) {
         console.log(`[消息转发] 发现 ${normalMessages.length} 条未转发的消息，开始转发...`);
+        console.log(`[消息转发] 当前客户端连接数: WebSocket=${clients.size}, HTTP=${httpClients.size}`);
       }
       
       // 对于测试消息，如果没有客户端连接，直接标记为已转发（避免重复尝试）
@@ -905,16 +925,29 @@ app.prepare().then(() => {
             created_at: row.created_at
           };
 
+          if (!isTestMessage) {
+            console.log(`[消息转发] 开始转发消息 ID: ${row.id}, 来源: ${row.source}, 内容: ${row.content?.substring(0, 50)}...`);
+          }
+
           // 转发消息
           const forwardedCount = await forwardMessageToClients(message);
+          
+          if (!isTestMessage) {
+            console.log(`[消息转发] 消息 ID: ${row.id} 已转发给 ${forwardedCount} 个客户端`);
+          }
         
           // 标记为已转发（即使没有客户端连接，也标记为已转发，避免重复尝试）
           await pool.execute(
             'UPDATE messages SET forwarded = 1 WHERE id = ?',
             [row.id]
           );
+          
+          if (!isTestMessage) {
+            console.log(`[消息转发] 消息 ID: ${row.id} 已标记为已转发`);
+          }
         } catch (error) {
-          console.error(`转发消息失败 (ID: ${row.id}):`, error);
+          console.error(`[消息转发] ❌ 转发消息失败 (ID: ${row.id}):`, error);
+          console.error(`[消息转发] 错误堆栈:`, error.stack);
         }
       }
 

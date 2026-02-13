@@ -315,6 +315,43 @@ export default async function handler(
       return res.status(500).json(errorResponse);
     }
 
+    // 立即发送到 Telegram 群组（异步，不阻塞响应）
+    try {
+      const { sendTelegramMessage, formatTradingViewMessageForTelegram } = await import('@/lib/telegram');
+      
+      // 格式化消息
+      const telegramMessage = formatTradingViewMessageForTelegram(
+        title,
+        content,
+        metadata
+      );
+      
+      console.log('[Telegram] 📤 准备发送 TradingView 消息到 Telegram，消息 ID:', savedMessage.id);
+      
+      // 发送到 Telegram（异步，不等待结果）
+      sendTelegramMessage(telegramMessage).then((result) => {
+        if (result.success) {
+          console.log('[Telegram] ✅ TradingView 消息已发送到 Telegram 群组:', {
+            messageId: savedMessage.id,
+            telegramMessageId: result.result?.message_id
+          });
+        } else {
+          console.error('[Telegram] ❌ TradingView 消息发送失败:', {
+            messageId: savedMessage.id,
+            error: result.error
+          });
+        }
+      }).catch((error) => {
+        console.error('[Telegram] ❌ 发送 TradingView 消息时出错:', {
+          messageId: savedMessage.id,
+          error: error.message
+        });
+      });
+    } catch (telegramError: any) {
+      // 静默处理错误，不影响主响应
+      console.error('[Telegram] ❌ 无法导入 Telegram 工具函数:', telegramError.message);
+    }
+
     // 返回成功响应
     const responseData = {
       success: true,
