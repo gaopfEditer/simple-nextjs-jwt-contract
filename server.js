@@ -188,6 +188,7 @@ app.prepare().then(() => {
       if (pathname === '/debug/ws-clients' && req.method === 'GET') {
         const clientsList = Array.from(clients.entries()).map(([ws, info]) => ({
           id: info.id,
+          clientType: info.clientType || null,
           boundTo: typeof info.boundTo === 'object' ? 'WebSocket' : info.boundTo,
           deviceInfo: info.deviceInfo || null,
           readyState: ws.readyState === WebSocket.OPEN ? 'OPEN' : ws.readyState === WebSocket.CONNECTING ? 'CONNECTING' : ws.readyState === WebSocket.CLOSING ? 'CLOSING' : 'CLOSED'
@@ -198,6 +199,37 @@ app.prepare().then(() => {
           total: clients.size,
           clients: clientsList
         }, null, 2));
+        return;
+      }
+      
+      // OpenClaw 专用转发：将下一个角色名称转发给 type=openclaw 的 WebSocket 连接
+      if (pathname === '/api/openclaw/forward' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        req.on('end', async () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            const nextRole = data.nextRole || data.next_role || data.role;
+            const targetType = data.type || 'openclaw';
+            let forwardedCount = 0;
+            if (nextRole) {
+              forwardedCount = await forwardToOpenClawClients(nextRole, targetType);
+              console.log(`[OpenClaw转发] 下一个角色 "${nextRole}" 已发送给 ${forwardedCount} 个 type=${targetType} 的客户端`);
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: '已转发给 OpenClaw 客户端',
+              nextRole: nextRole || null,
+              forwardedCount
+            }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON', message: e.message }));
+          }
+        });
         return;
       }
       
@@ -505,12 +537,20 @@ app.prepare().then(() => {
 
   wss.on('connection', (ws, req) => {
     const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`新的 WebSocket 连接已建立: ${clientId}`);
+    // 解析连接 URL 中的 type 参数，例如 /api/ws?type=openclaw
+    const parsedUrl = parse(req.url || '', true);
+    const clientType = (parsedUrl.query && parsedUrl.query.type) || null;
+    if (clientType) {
+      console.log(`新的 WebSocket 连接已建立: ${clientId}, type=${clientType}`);
+    } else {
+      console.log(`新的 WebSocket 连接已建立: ${clientId}`);
+    }
     
     clients.set(ws, {
       id: clientId,
       boundTo: null,
-      deviceInfo: null
+      deviceInfo: null,
+      clientType: clientType || null  // 例如 'openclaw'
     });
 
     // 发送欢迎消息
@@ -762,6 +802,29 @@ app.prepare().then(() => {
       clearInterval(heartbeat);
     });
   });
+
+  // 转发下一个角色名称到 type=openclaw 的 WebSocket 客户端
+  async function forwardToOpenClawClients(nextRole, targetType = 'openclaw') {
+    const messageData = {
+      type: 'openclaw_next_role',
+      nextRole: nextRole,
+      timestamp: new Date().toISOString()
+    };
+    const messageJson = JSON.stringify(messageData);
+    let count = 0;
+    clients.forEach((clientInfo, ws) => {
+      if (clientInfo.clientType === targetType && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(messageJson);
+          count++;
+          console.log(`[OpenClaw转发] 已发送 nextRole="${nextRole}" 到客户端 ${clientInfo.id}`);
+        } catch (err) {
+          console.error(`[OpenClaw转发] 发送失败 (${clientInfo.id}):`, err);
+        }
+      }
+    });
+    return count;
+  }
 
   // 转发消息到所有WebSocket客户端
   async function forwardMessageToClients(message) {
@@ -1025,6 +1088,7 @@ app.prepare().then(() => {
       console.log(`> ✅ WebSocket 服务器已启动: ws://${hostname}:${port}/api/ws`);
       console.log(`> ✅ 消息API: http://${hostname}:${port}/api/messages/receive`);
       console.log(`> ✅ TradingView API: http://${hostname}:${port}/api/tradingview/receive`);
+      console.log(`> ✅ OpenClaw Webhook: http://${hostname}:${port}/api/openclaw/webhook`);
       console.log(`> ✅ 服务器正在监听端口 ${port}，等待请求...`);
       
       // 服务器启动后初始化数据库连接池
