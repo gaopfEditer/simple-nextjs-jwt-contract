@@ -245,6 +245,271 @@
   font-size: 16px;
 }
 
+/* OpenClaw 会话 */
+.openclawContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.openclawContent .description {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.openclawToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.openclawCount {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.openclawRefreshBtn {
+  padding: 6px 14px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.openclawRefreshBtn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.openclawRefreshBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.openclawError {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.openclawEmpty {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.openclawList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.openclawItem {
+  margin-bottom: 8px;
+}
+
+.openclawItemBtn,
+.openclawItemActive {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.openclawItemBtn:hover {
+  border-color: #667eea;
+  background: #f5f3ff;
+}
+
+.openclawItemActive {
+  border-color: #667eea;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.openclawItemId {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.openclawItemDevice {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openclawWsStatus {
+  font-size: 12px;
+  color: #059669;
+  margin-left: 12px;
+}
+
+.openclawItemBadge {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #667eea;
+  color: white;
+  border-radius: 4px;
+}
+
+.openclawSend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.openclawInput {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.openclawInput:focus {
+  border-color: #667eea;
+}
+
+.openclawSendBtn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.openclawSendBtn:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.openclawSendBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.openclawHistory {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  max-height: 260px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.openclawHistoryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.openclawHistoryTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.openclawHistoryBody {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #e5e7eb;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.openclawHistoryEmpty {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.openclawHistoryItem {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.openclawHistoryMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.openclawHistoryTag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.openclawHistoryTime {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.openclawHistoryOriginal {
+  font-size: 12px;
+  color: #4b5563;
+  margin-bottom: 4px;
+}
+
+.openclawHistoryLabel {
+  font-weight: 500;
+}
+
+.openclawHistoryResponse {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .navContent {

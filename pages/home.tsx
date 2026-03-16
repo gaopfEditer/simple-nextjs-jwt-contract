@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -7,13 +7,17 @@ import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
 import styles from '../styles/HomePage.module.css';
 
-type TabType = 'chat' | 'home' | 'dashboard';
+type TabType = 'chat' | 'home' | 'dashboard' | 'openclaw';
 
 export default function HomePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('chat');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [openclawClients, setOpenclawClients] = useState<{ id: string; clientType: string }[]>([]);
+  const [openclawLoading, setOpenclawLoading] = useState(false);
+  const [selectedOpenclawId, setSelectedOpenclawId] = useState<string | null>(null);
+  const [openclawError, setOpenclawError] = useState<string | null>(null);
 
   // 检查用户登录状态
   useEffect(() => {
@@ -29,6 +33,58 @@ export default function HomePage() {
     }
     checkAuth();
   }, []);
+
+  // OpenClaw：拉取会话列表，并轮询以便每连接一个就新增到列表
+  const fetchOpenclawClients = useCallback(async () => {
+    try {
+      const res = await fetch('/api/openclaw/clients');
+      const data = await res.json().catch(() => ({})) as { success?: boolean; clients?: { id: string; clientType: string }[] };
+      if (data.success && Array.isArray(data.clients)) {
+        setOpenclawClients(data.clients);
+      } else {
+        setOpenclawClients([]);
+      }
+      setOpenclawError(null);
+    } catch (err) {
+      setOpenclawError((err as Error).message || '获取会话列表失败');
+      setOpenclawClients([]);
+    } finally {
+      setOpenclawLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'openclaw') return;
+    setOpenclawLoading(true);
+    setOpenclawError(null);
+    fetchOpenclawClients();
+    const timer = setInterval(fetchOpenclawClients, 3000);
+    return () => clearInterval(timer);
+  }, [activeTab, fetchOpenclawClients]);
+
+  // 切换到指定 OpenClaw 会话并下发消息
+  const handleSelectOpenclawSession = (clientId: string) => {
+    setSelectedOpenclawId(clientId);
+    fetch('/api/openclaw/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId,
+        type: 'session_selected',
+        message: '当前会话已被选中',
+        timestamp: new Date().toISOString(),
+      }),
+    })
+      .then((res) => res.json())
+      .then((data: { success?: boolean; sent?: boolean }) => {
+        if (!data.success || !data.sent) {
+          setOpenclawError('下发失败或客户端已断开');
+        } else {
+          setOpenclawError(null);
+        }
+      })
+      .catch(() => setOpenclawError('下发请求失败'));
+  };
 
   return (
     <>
@@ -90,6 +146,13 @@ export default function HomePage() {
               <span className={styles.tabIcon}>📊</span>
               <span>仪表盘</span>
             </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'openclaw' ? styles.active : ''}`}
+              onClick={() => setActiveTab('openclaw')}
+            >
+              <span className={styles.tabIcon}>🦾</span>
+              <span>OpenClaw</span>
+            </button>
           </div>
         </div>
 
@@ -148,6 +211,40 @@ export default function HomePage() {
                       注册
                     </Link>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'openclaw' && (
+            <div className={styles.tabContent}>
+              <div className={styles.openclawContent}>
+                <h1 className={styles.title}>OpenClaw 会话</h1>
+                <p className={styles.description}>
+                  当前已连接的 type=openclaw 客户端。点击会话即向该客户端下发「会话选中」消息。
+                </p>
+                {openclawLoading && <div className={styles.loading}>加载中...</div>}
+                {openclawError && (
+                  <div className={styles.openclawError}>{openclawError}</div>
+                )}
+                {!openclawLoading && openclawClients.length === 0 && (
+                  <div className={styles.openclawEmpty}>暂无 OpenClaw 会话，请使用 type=openclaw 连接 WebSocket。</div>
+                )}
+                {!openclawLoading && openclawClients.length > 0 && (
+                  <ul className={styles.openclawList}>
+                    {openclawClients.map((c) => (
+                      <li key={c.id} className={styles.openclawItem}>
+                        <button
+                          type="button"
+                          className={selectedOpenclawId === c.id ? styles.openclawItemActive : styles.openclawItemBtn}
+                          onClick={() => handleSelectOpenclawSession(c.id)}
+                        >
+                          <span className={styles.openclawItemId}>{c.id}</span>
+                          {selectedOpenclawId === c.id && <span className={styles.openclawItemBadge}>已选中</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>

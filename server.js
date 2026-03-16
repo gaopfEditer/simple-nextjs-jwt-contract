@@ -76,7 +76,10 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
-      const pathname = parsedUrl.pathname;
+      const pathname = (parsedUrl.pathname || '').replace(/\/$/, '') || '/';
+      if (pathname.indexOf('openclaw') !== -1) {
+        console.log('[OpenClaw] 请求到达 server.js:', req.method, pathname);
+      }
       
       // Next.js 热更新相关路径，直接交给 Next.js 处理
       if (pathname?.startsWith('/_next/')) {
@@ -228,6 +231,80 @@ app.prepare().then(() => {
           } catch (e) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Invalid JSON', message: e.message }));
+          }
+        });
+        return;
+      }
+      
+      // 获取 openclaw 会话列表（仅 type=openclaw 且连接为 OPEN 的客户端）
+      if (req.method === 'GET' && (pathname === '/api/openclaw/clients' || pathname.startsWith('/api/openclaw/clients?'))) {
+        try {
+          const list = [];
+          const map = typeof clients !== 'undefined' ? clients : new Map();
+          const total = map.size;
+          const debug = [];
+          for (const [ws, info] of map.entries()) {
+            const state = ws.readyState;
+            const type = info.clientType;
+            debug.push({ id: info.id, type, state: state === WebSocket.OPEN ? 'OPEN' : state });
+            if (type === 'openclaw' && state === WebSocket.OPEN) {
+              list.push({
+                id: info.id,
+                clientType: type || 'openclaw',
+                deviceInfo: info.deviceInfo || null
+              });
+            }
+          }
+          console.log('[OpenClaw] GET /clients | 总连接数:', total, '| openclaw+OPEN:', list.length, '| 明细:', JSON.stringify(debug));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, clients: list }));
+        } catch (e) {
+          console.error('[OpenClaw] GET /clients 错误:', e);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, clients: [] }));
+        }
+        return;
+      }
+      
+      // 向指定 openclaw 客户端下发消息（通过 WebSocket）
+      if (pathname === '/api/openclaw/send' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            const clientId = data.clientId || data.client_id;
+            if (!clientId) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: '缺少 clientId' }));
+              return;
+            }
+            const openclawPeers = [];
+            for (const [w, inf] of clients.entries()) {
+              if (inf.clientType === 'openclaw' && w.readyState === WebSocket.OPEN) {
+                openclawPeers.push({
+                  id: inf.id,
+                  clientType: inf.clientType || 'openclaw',
+                  deviceInfo: inf.deviceInfo || null
+                });
+              }
+            }
+            let sent = false;
+            for (const [ws, info] of clients.entries()) {
+              if (info.id === clientId && info.clientType === 'openclaw' && ws.readyState === WebSocket.OPEN) {
+                const payload = { type: 'openclaw_command', openclawPeers, ...data };
+                delete payload.clientId;
+                delete payload.client_id;
+                ws.send(JSON.stringify(payload));
+                sent = true;
+                break;
+              }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, sent }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
           }
         });
         return;
@@ -581,6 +658,22 @@ app.prepare().then(() => {
           return;
         }
 
+        // OpenClaw 执行端返回的用户消息结果，按 client_id 转发给前端控制端
+        if (data.type === 'user_message_response' && data.client_id) {
+          const targetClientId = data.client_id;
+          clients.forEach((targetInfo, targetWs) => {
+            if (targetWs.readyState === WebSocket.OPEN && targetInfo.clientType !== 'openclaw') {
+              targetWs.send(JSON.stringify({
+                type: 'openclaw_history',
+                clientId: targetClientId,
+                message: data,
+                timestamp: new Date().toISOString()
+              }));
+            }
+          });
+          return;
+        }
+
         // 处理绑定请求
         if (data.type === 'bind' && data.targetClientId) {
           let targetWs = null;
@@ -803,11 +896,22 @@ app.prepare().then(() => {
     });
   });
 
-  // 转发下一个角色名称到 type=openclaw 的 WebSocket 客户端
+  // 转发下一个角色名称到 type=openclaw 的 WebSocket 客户端（消息中附带所有已连接的 openclaw 客户端 id + deviceInfo）
   async function forwardToOpenClawClients(nextRole, targetType = 'openclaw') {
+    const openclawPeers = [];
+    clients.forEach((inf, w) => {
+      if (inf.clientType === targetType && w.readyState === WebSocket.OPEN) {
+        openclawPeers.push({
+          id: inf.id,
+          clientType: inf.clientType || 'openclaw',
+          deviceInfo: inf.deviceInfo || null
+        });
+      }
+    });
     const messageData = {
       type: 'openclaw_next_role',
       nextRole: nextRole,
+      openclawPeers,
       timestamp: new Date().toISOString()
     };
     const messageJson = JSON.stringify(messageData);
@@ -817,7 +921,7 @@ app.prepare().then(() => {
         try {
           ws.send(messageJson);
           count++;
-          console.log(`[OpenClaw转发] 已发送 nextRole="${nextRole}" 到客户端 ${clientInfo.id}`);
+          console.log(`[OpenClaw转发] 已发送 nextRole="${nextRole}" (含 ${openclawPeers.length} 个 peer) 到客户端 ${clientInfo.id}`);
         } catch (err) {
           console.error(`[OpenClaw转发] 发送失败 (${clientInfo.id}):`, err);
         }
