@@ -125,6 +125,7 @@ export default async function handler(
     let high: number | null = null;
     let low: number | null = null;
     let description: string = '';
+    let period: string = '';
 
     // 检查是否包含 ; 分隔符
     if (!message.includes(';')) {
@@ -185,6 +186,9 @@ export default async function handler(
       const lowVal = parseFloat(dataFields[5]);
       low = isNaN(lowVal) ? null : lowVal;
     }
+    if (dataFields.length >= 7 && dataFields[7] && dataFields[7].trim()) {
+      period = dataFields[7].trim();
+    }
 
     // 调试日志：显示解析结果
     console.log('[解析结果] ticker:', ticker, 'type:', type, 'time:', time, 'close:', close);
@@ -234,6 +238,7 @@ export default async function handler(
     const metadata: any = {
       source: 'tradingview',
       ticker,
+      period,
       type: type || 'trading_signal',
       time,
       close,
