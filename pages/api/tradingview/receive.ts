@@ -186,8 +186,8 @@ export default async function handler(
       const lowVal = parseFloat(dataFields[5]);
       low = isNaN(lowVal) ? null : lowVal;
     }
-    if (dataFields.length >= 7 && dataFields[7] && dataFields[7].trim()) {
-      period = dataFields[7].trim();
+    if (dataFields.length >= 7 && dataFields[6] && dataFields[6].trim()) {
+      period = dataFields[6].trim();
     }
 
     // 调试日志：显示解析结果

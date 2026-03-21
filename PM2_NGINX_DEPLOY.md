@@ -170,6 +170,7 @@ pm2 save
 ### 4. PM2 常用命令
 
 ```bash
+一般需要先构建 pnpm build 
 # 重启应用
 pm2 restart nextjs-jwt-app
 
