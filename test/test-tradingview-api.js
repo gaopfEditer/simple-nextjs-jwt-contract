@@ -5,7 +5,7 @@ const { URL } = require('url');
 
 // 新格式测试数据（推荐）
 // 格式：{{ticker}} | {{type}} | {{time}} | {{close}} | {{high}} | {{low}} ; {{描述}}
-const newFormatData = JSON.stringify('MYXUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 ; MYXUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900');
+const newFormatData = JSON.stringify('MYXUSDT | RSI超买 | 2024-01-15T10:30:00Z | 45000.5 | 45100 | 44900 | 15m ; MYXUSDT RSI超买 | 时间:2024-01-15T10:30:00Z | 价格:45000.5 | 最高:45100 | 最低:44900');
 
 // 旧格式测试数据（兼容）
 const oldFormatData = JSON.stringify({
