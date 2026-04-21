@@ -19,21 +19,6 @@ module.exports = {
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z', // 日志时间格式
     merge_logs: true,                        // 合并日志
     
-    // 开发环境配置
-    env: {
-      NODE_ENV: 'development',
-      PORT: 3123,
-      HOSTNAME: 'localhost',
-      // 数据库配置（从 .env.local 读取，这里可以设置默认值）
-      DB_HOST: 'localhost',
-      DB_PORT: '3306',
-      DB_USER: 'root',
-      DB_PASSWORD: '',
-      DB_NAME: 'nextjs_jwt',
-      // JWT 配置
-      JWT_SECRET: 'dev-secret-key-change-in-production',
-      JWT_EXPIRES_IN: '7d',
-    },
     
     // 生产环境配置
     env_production: {

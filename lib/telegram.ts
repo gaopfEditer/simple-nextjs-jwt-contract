@@ -57,10 +57,25 @@ export async function sendTelegramMessage(
     };
 
     // 配置代理（如果需要）
-    let proxyUrl = process.env.HTTP_PROXY || 
-                   process.env.HTTPS_PROXY || 
-                   process.env.http_proxy || 
+    let proxyUrl = process.env.HTTP_PROXY ||
+                   process.env.HTTPS_PROXY ||
+                   process.env.http_proxy ||
                    process.env.https_proxy;
+
+    if (proxyUrl && process.env.NODE_ENV === 'production' && process.env.TELEGRAM_FORCE_HTTP_PROXY !== '1') {
+      try {
+        const normalized = proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://') ? proxyUrl : `http://${proxyUrl}`;
+        const u = new URL(normalized);
+        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+          console.warn(
+            '[Telegram] ⚠️ 生产环境已忽略指向本机的 HTTP(S)_PROXY，避免服务器上 ECONNREFUSED 127.0.0.1:7890'
+          );
+          proxyUrl = undefined;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     // 规范化代理 URL
     if (proxyUrl) {

@@ -94,13 +94,32 @@ export default async function handler(
       parse_mode: 'HTML', // 支持 HTML 格式
     };
 
-    // 配置代理（如果需要）
-    let proxyUrl = process.env.HTTP_PROXY || 
-                   process.env.HTTPS_PROXY || 
-                   process.env.http_proxy || 
+    // 配置代理（如果需要）：来自 HTTP_PROXY / HTTPS_PROXY 等
+    let proxyUrl = process.env.HTTP_PROXY ||
+                   process.env.HTTPS_PROXY ||
+                   process.env.http_proxy ||
                    process.env.https_proxy;
 
-    console.log('====[Telegram] ℹ️ 使用代理:', proxyUrl);
+    // 生产环境常见误配：把本机 Clash 端口（如 127.0.0.1:7890）写进 .env，部署到服务器后无人监听 → ECONNREFUSED
+    if (proxyUrl && process.env.NODE_ENV === 'production' && process.env.TELEGRAM_FORCE_HTTP_PROXY !== '1') {
+      try {
+        const normalized = proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://') ? proxyUrl : `http://${proxyUrl}`;
+        const u = new URL(normalized);
+        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+          console.warn(
+            '[Telegram] ⚠️ 生产环境已忽略指向本机的 HTTP(S)_PROXY（避免 connect ECONNREFUSED 127.0.0.1:7890）。' +
+              '请在服务器上删除或改为可访问的外网代理；若确需本机代理请设 TELEGRAM_FORCE_HTTP_PROXY=1'
+          );
+          proxyUrl = undefined;
+        }
+      } catch {
+        // 解析失败则仍按原值尝试
+      }
+    }
+
+    if (proxyUrl) {
+      console.log('====[Telegram] ℹ️ 使用代理:', proxyUrl);
+    }
     // 规范化代理 URL
     if (proxyUrl) {
       // 如果代理 URL 格式不正确，尝试修复
