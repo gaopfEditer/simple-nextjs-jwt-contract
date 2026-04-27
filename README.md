@@ -249,6 +249,9 @@ npm run dev
 ## 开发命令
 
 ```bash
+
+ssh -L 3308:127.0.0.1:3306 -N -f root@60.205.120.196
+
 # 开发模式
 npm run dev
 
