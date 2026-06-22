@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.pnpm-store
 
 # testing
 /coverage
@@ -38,3 +39,4 @@ next-env.d.ts
 # PM2 logs
 /logs
 *.log
+.*

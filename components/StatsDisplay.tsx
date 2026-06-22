@@ -1,7 +1,9 @@
 import React from 'react';
 import { useSiteStats } from '@/lib/use-stats';
 import { useSite } from '@/lib/site-context';
-import styles from '@/styles/StatsDisplay.module.css';
+import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StatsDisplayProps {
   className?: string;
@@ -14,58 +16,62 @@ export default function StatsDisplay({ className, showLabels = true }: StatsDisp
 
   if (loading) {
     return (
-      <div className={`${styles.statsContainer} ${className || ''}`}>
-        <div className={styles.loading}>加载中...</div>
+      <div className={cn('grid gap-4 sm:grid-cols-3', className)}>
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <Skeleton className="mb-2 h-4 w-24" />
+              <Skeleton className="h-8 w-16" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`${styles.statsContainer} ${className || ''}`}>
-        <div className={styles.error}>加载失败: {error}</div>
+      <p className={cn('text-sm text-destructive', className)}>加载失败: {error}</p>
+    );
+  }
+
+  if (!stats) return null;
+
+  const items = [
+    {
+      label: `本站总访问量${currentSiteId !== 'local' ? ` (${currentSiteId})` : ''}`,
+      value: stats.totalVisits.toLocaleString(),
+      unit: '次',
+    },
+    { label: '本站总访客数', value: stats.uniqueVisitors.toLocaleString(), unit: '人' },
+    { label: '文章总阅读量', value: stats.totalArticleViews.toLocaleString(), unit: '次' },
+  ];
+
+  if (!showLabels) {
+    return (
+      <div className={cn('flex flex-wrap gap-4 text-sm', className)}>
+        {items.map((item) => (
+          <span key={item.label}>
+            <span className="font-semibold">{item.value}</span> {item.unit}
+          </span>
+        ))}
       </div>
     );
   }
 
-  if (!stats) {
-    return null;
-  }
-
   return (
-    <div className={`${styles.statsContainer} ${className || ''}`}>
-      {showLabels && (
-        <>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>
-              本站总访问量 {currentSiteId !== 'local' && `(${currentSiteId})`}
-            </span>
-            <span className={styles.statValue}>{stats.totalVisits.toLocaleString()}</span>
-            <span className={styles.statUnit}>次</span>
-          </div>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>本站总访客数</span>
-            <span className={styles.statValue}>{stats.uniqueVisitors.toLocaleString()}</span>
-            <span className={styles.statUnit}>人</span>
-          </div>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>文章总阅读量</span>
-            <span className={styles.statValue}>{stats.totalArticleViews.toLocaleString()}</span>
-            <span className={styles.statUnit}>次</span>
-          </div>
-        </>
-      )}
-      {!showLabels && (
-        <>
-          <span className={styles.statValue}>{stats.totalVisits.toLocaleString()}</span>
-          <span className={styles.statUnit}>次</span>
-          <span className={styles.statValue}>{stats.uniqueVisitors.toLocaleString()}</span>
-          <span className={styles.statUnit}>人</span>
-          <span className={styles.statValue}>{stats.totalArticleViews.toLocaleString()}</span>
-          <span className={styles.statUnit}>次</span>
-        </>
-      )}
+    <div className={cn('grid gap-4 sm:grid-cols-3', className)}>
+      {items.map((item) => (
+        <Card key={item.label}>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">{item.label}</p>
+            <p className="mt-1 text-2xl font-bold tracking-tight">
+              {item.value}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">{item.unit}</span>
+            </p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
-

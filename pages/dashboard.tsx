@@ -5,21 +5,23 @@ import Link from 'next/link';
 import { getCurrentUser, logout as apiLogout } from '@/lib/api';
 import { getPostList, getProductList, Post, Product } from '@/lib/external-api';
 import { removeToken } from '@/lib/auth';
-import styles from '../styles/Dashboard.module.css';
+import { AppNavbar, LoadingState, PageContainer, InfoRow } from '@/components/layout/AppShell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'posts' | 'products'>('posts');
-  
-  // 帖子列表
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsPage, setPostsPage] = useState(1);
   const [postsTotal, setPostsTotal] = useState(0);
-  
-  // 产品列表
+
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsPage, setProductsPage] = useState(1);
@@ -30,8 +32,7 @@ export default function DashboardPage() {
       try {
         const userData = await getCurrentUser();
         setUser(userData);
-      } catch (error) {
-        // 未授权，跳转到登录页
+      } catch {
         router.push('/login');
       } finally {
         setLoading(false);
@@ -40,7 +41,6 @@ export default function DashboardPage() {
     loadUser();
   }, [router]);
 
-  // 加载帖子列表
   useEffect(() => {
     async function loadPosts() {
       if (activeTab === 'posts' && user) {
@@ -59,7 +59,6 @@ export default function DashboardPage() {
     loadPosts();
   }, [activeTab, postsPage, user]);
 
-  // 加载产品列表
   useEffect(() => {
     async function loadProducts() {
       if (activeTab === 'products' && user) {
@@ -90,15 +89,72 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        <div className={styles.loading}>加载中...</div>
+      <div className="min-h-screen bg-background">
+        <AppNavbar />
+        <LoadingState />
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  const renderList = (
+    items: (Post | Product)[],
+    isLoading: boolean,
+    page: number,
+    total: number,
+    setPage: (p: number) => void
+  ) => (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          第 {page} 页 / 共 {Math.ceil(total / 10) || 1} 页（共 {total} 条）
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1 || isLoading}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(page + 1)}
+            disabled={page >= Math.ceil(total / 10) || isLoading}
+          >
+            下一页
+          </Button>
+        </div>
+      </div>
+      {isLoading ? (
+        <LoadingState />
+      ) : items.length > 0 ? (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <Card key={item.id}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">ID: {item.id}</Badge>
+                  <Badge variant="outline">编码: {item.code}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p><span className="text-muted-foreground">产品类型:</span> {item.product_type}</p>
+                <p><span className="text-muted-foreground">产品名称:</span> {item.product_name}</p>
+                <p><span className="text-muted-foreground">创建时间:</span> {new Date(item.created_at).toLocaleString('zh-CN')}</p>
+                <p><span className="text-muted-foreground">更新时间:</span> {new Date(item.updated_at).toLocaleString('zh-CN')}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <p className="py-8 text-center text-sm text-muted-foreground">暂无数据</p>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -107,177 +163,56 @@ export default function DashboardPage() {
         <meta name="description" content="用户仪表板" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <div className={styles.container}>
-        <nav className={styles.nav}>
-          <div className={styles.navContent}>
-            <Link href="/" className={styles.logo}>
-              JWT 认证系统
-            </Link>
-            <button onClick={handleLogout} className="btn btn-secondary">
-              登出
-            </button>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
+          <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
+            <Link href="/" className="font-semibold">JWT 认证系统</Link>
+            <Button variant="outline" size="sm" onClick={handleLogout}>登出</Button>
           </div>
-        </nav>
-        <main className={styles.main}>
-          <div className={styles.card}>
-            <h1 className={styles.title}>欢迎回来，{user.email}！</h1>
-            <div className={styles.userInfo}>
-              <div className={styles.infoItem}>
-                <span className={styles.label}>用户 ID:</span>
-                <span className={styles.value}>{user.id}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.label}>邮箱:</span>
-                <span className={styles.value}>{user.email}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.label}>账户状态:</span>
-                <span className={styles.value}>
-                  {user.is_enabled ? '已启用' : '已禁用'}
-                </span>
-              </div>
+        </header>
+
+        <PageContainer className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>欢迎回来，{user.email}</CardTitle>
+              <CardDescription>您的账户信息概览</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <InfoRow label="用户 ID" value={user.id} />
+              <InfoRow label="邮箱" value={user.email} />
+              <InfoRow label="账户状态" value={user.is_enabled ? '已启用' : '已禁用'} />
               {user.last_login_at && (
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>最后登录时间:</span>
-                  <span className={styles.value}>
-                    {new Date(user.last_login_at).toLocaleString('zh-CN')}
-                  </span>
-                </div>
+                <InfoRow label="最后登录时间" value={new Date(user.last_login_at).toLocaleString('zh-CN')} />
               )}
               {user.created_at && (
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>注册时间:</span>
-                  <span className={styles.value}>
-                    {new Date(user.created_at).toLocaleString('zh-CN')}
-                  </span>
-                </div>
+                <InfoRow label="注册时间" value={new Date(user.created_at).toLocaleString('zh-CN')} />
               )}
-            </div>
-            <div className={styles.actions}>
-              <Link href="/" className="btn btn-primary">
-                返回首页
-              </Link>
-            </div>
-          </div>
-
-          {/* 业务数据展示 */}
-          <div className={styles.card}>
-            <div className={styles.tabs}>
-              <button
-                className={`${styles.tab} ${activeTab === 'posts' ? styles.active : ''}`}
-                onClick={() => setActiveTab('posts')}
-              >
-                帖子列表
-              </button>
-              <button
-                className={`${styles.tab} ${activeTab === 'products' ? styles.active : ''}`}
-                onClick={() => setActiveTab('products')}
-              >
-                产品列表
-              </button>
-            </div>
-
-            {activeTab === 'posts' && (
-              <div className={styles.listContainer}>
-                <div className={styles.listHeader}>
-                  <h2>帖子列表</h2>
-                  <div className={styles.pagination}>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setPostsPage(Math.max(1, postsPage - 1))}
-                      disabled={postsPage === 1 || postsLoading}
-                    >
-                      上一页
-                    </button>
-                    <span className={styles.pageInfo}>
-                      第 {postsPage} 页 / 共 {Math.ceil(postsTotal / 10)} 页（共 {postsTotal} 条）
-                    </span>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setPostsPage(postsPage + 1)}
-                      disabled={postsPage >= Math.ceil(postsTotal / 10) || postsLoading}
-                    >
-                      下一页
-                    </button>
-                  </div>
-                </div>
-                {postsLoading ? (
-                  <div className={styles.loading}>加载中...</div>
-                ) : posts.length > 0 ? (
-                  <div className={styles.list}>
-                    {posts.map((post) => (
-                      <div key={post.id} className={styles.listItem}>
-                        <div className={styles.listItemHeader}>
-                          <span className={styles.listItemId}>ID: {post.id}</span>
-                          <span className={styles.listItemCode}>编码: {post.code}</span>
-                        </div>
-                        <div className={styles.listItemContent}>
-                          <p><strong>产品类型:</strong> {post.product_type}</p>
-                          <p><strong>产品名称:</strong> {post.product_name}</p>
-                          <p><strong>创建时间:</strong> {new Date(post.created_at).toLocaleString('zh-CN')}</p>
-                          <p><strong>更新时间:</strong> {new Date(post.updated_at).toLocaleString('zh-CN')}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className={styles.empty}>暂无数据</div>
-                )}
+              <div className="pt-4">
+                <Button asChild>
+                  <Link href="/">返回首页</Link>
+                </Button>
               </div>
-            )}
+            </CardContent>
+          </Card>
 
-            {activeTab === 'products' && (
-              <div className={styles.listContainer}>
-                <div className={styles.listHeader}>
-                  <h2>产品列表</h2>
-                  <div className={styles.pagination}>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setProductsPage(Math.max(1, productsPage - 1))}
-                      disabled={productsPage === 1 || productsLoading}
-                    >
-                      上一页
-                    </button>
-                    <span className={styles.pageInfo}>
-                      第 {productsPage} 页 / 共 {Math.ceil(productsTotal / 10)} 页（共 {productsTotal} 条）
-                    </span>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => setProductsPage(productsPage + 1)}
-                      disabled={productsPage >= Math.ceil(productsTotal / 10) || productsLoading}
-                    >
-                      下一页
-                    </button>
-                  </div>
-                </div>
-                {productsLoading ? (
-                  <div className={styles.loading}>加载中...</div>
-                ) : products.length > 0 ? (
-                  <div className={styles.list}>
-                    {products.map((product) => (
-                      <div key={product.id} className={styles.listItem}>
-                        <div className={styles.listItemHeader}>
-                          <span className={styles.listItemId}>ID: {product.id}</span>
-                          <span className={styles.listItemCode}>编码: {product.code}</span>
-                        </div>
-                        <div className={styles.listItemContent}>
-                          <p><strong>产品类型:</strong> {product.product_type}</p>
-                          <p><strong>产品名称:</strong> {product.product_name}</p>
-                          <p><strong>创建时间:</strong> {new Date(product.created_at).toLocaleString('zh-CN')}</p>
-                          <p><strong>更新时间:</strong> {new Date(product.updated_at).toLocaleString('zh-CN')}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className={styles.empty}>暂无数据</div>
-                )}
-              </div>
-            )}
-          </div>
-        </main>
+          <Card>
+            <CardHeader>
+              <CardTitle>业务数据</CardTitle>
+              <CardDescription>帖子与产品列表</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'posts' | 'products')}>
+                <TabsList>
+                  <TabsTrigger value="posts">帖子列表</TabsTrigger>
+                  <TabsTrigger value="products">产品列表</TabsTrigger>
+                </TabsList>
+                <TabsContent value="posts">{renderList(posts, postsLoading, postsPage, postsTotal, setPostsPage)}</TabsContent>
+                <TabsContent value="products">{renderList(products, productsLoading, productsPage, productsTotal, setProductsPage)}</TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </PageContainer>
       </div>
     </>
   );
 }
-

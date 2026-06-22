@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import ChatBox from '@/components/ChatBox';
 import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
 import GeminiChat from '@/components/GeminiChat';
-import styles from '../styles/HomePage.module.css';
+import { AppShell, AppTabs, PageContainer, InfoRow, LoadingState } from '@/components/layout/AppShell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { MessageSquare, Radio, Home as HomeIcon, LayoutDashboard, Bot, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type TabType = 'chat' | 'signals' | 'home' | 'dashboard' | 'openclaw' | 'gemini';
 
@@ -26,7 +32,6 @@ export interface OpenClawClientItem {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false); // 直接设为false，不等待
@@ -219,6 +224,15 @@ export default function Home() {
       .finally(() => setOpenclawSending(false));
   };
 
+  const tabs = [
+    { value: 'chat', label: '聊天室', icon: <MessageSquare className="h-4 w-4" /> },
+    { value: 'signals', label: '信号列表', icon: <Radio className="h-4 w-4" /> },
+    { value: 'home', label: '首页', icon: <HomeIcon className="h-4 w-4" /> },
+    { value: 'dashboard', label: '仪表盘', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { value: 'openclaw', label: 'OpenClaw', icon: <Bot className="h-4 w-4" /> },
+    { value: 'gemini', label: 'Gemini', icon: <Bot className="h-4 w-4" /> },
+  ];
+
   return (
     <>
       <Head>
@@ -227,317 +241,181 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <div className={styles.container}>
-        <nav className={styles.nav}>
-          <div className={styles.navContent}>
-            <Link href="/" className={styles.logo}>
-              JWT 认证系统
-            </Link>
-            <div className={styles.navLinks}>
-              {user ? (
-                <>
-                  <Link href="/dashboard" className={styles.navLink}>
-                    仪表盘
-                  </Link>
-                  <Link href="/login" className={styles.navLink}>
-                    登出
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/login" className={styles.navLink}>
-                    登录
-                  </Link>
-                  <Link href="/register" className={styles.navLink}>
-                    注册
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </nav>
+      <AppShell user={user}>
+        <AppTabs tabs={tabs} activeTab={activeTab} onTabChange={(v) => setActiveTab(v as TabType)} />
 
-        <div className={styles.tabsContainer}>
-          <div className={styles.tabs}>
-            <button
-              className={`${styles.tab} ${activeTab === 'chat' ? styles.active : ''}`}
-              onClick={() => setActiveTab('chat')}
-            >
-              <span className={styles.tabIcon}>💬</span>
-              <span>聊天室</span>
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'signals' ? styles.active : ''}`}
-              onClick={() => setActiveTab('signals')}
-            >
-              <span className={styles.tabIcon}>📢</span>
-              <span>信号列表</span>
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'home' ? styles.active : ''}`}
-              onClick={() => setActiveTab('home')}
-            >
-              <span className={styles.tabIcon}>🏠</span>
-              <span>首页</span>
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'dashboard' ? styles.active : ''}`}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              <span className={styles.tabIcon}>📊</span>
-              <span>仪表盘</span>
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'openclaw' ? styles.active : ''}`}
-              onClick={() => setActiveTab('openclaw')}
-            >
-              <span className={styles.tabIcon}>🦾</span>
-              <span>OpenClaw</span>
-            </button>
-            <button
-              className={`${styles.tab} ${activeTab === 'gemini' ? styles.active : ''}`}
-              onClick={() => setActiveTab('gemini')}
-            >
-              <span className={styles.tabIcon}>🤖</span>
-              <span>Gemini</span>
-            </button>
-          </div>
-        </div>
-
-        <main className={styles.main}>
-          {activeTab === 'chat' && (
-            <div className={styles.tabContent}>
-              <ChatBox filterSource="exclude_tradingview" title="聊天室" />
-            </div>
-          )}
-
-          {activeTab === 'signals' && (
-            <div className={styles.tabContent}>
-              <ChatBox filterSource="tradingview" title="信号列表" />
-            </div>
-          )}
+        <PageContainer>
+          {activeTab === 'chat' && <ChatBox filterSource="exclude_tradingview" title="聊天室" />}
+          {activeTab === 'signals' && <ChatBox filterSource="tradingview" title="信号列表" />}
 
           {activeTab === 'home' && (
-            <div className={styles.tabContent}>
-              <div className={styles.homeContent}>
-                <h1 className={styles.title}>欢迎使用 JWT 认证系统</h1>
-                <p className={styles.description}>
-                  这是一个基于 Next.js 和 JWT 的用户认证示例项目
-                </p>
-
-                {/* 显示访问统计 */}
-                <StatsDisplay />
-
-                <div className={styles.demoSection}>
-                  <h2 className={styles.sectionTitle}>示例功能</h2>
-                  <p className={styles.sectionDesc}>访问示例文章查看阅读量统计，或进入管理页面查看详细数据</p>
-                  <div className={styles.actions}>
-                    <Link href="/article/1" className="btn btn-secondary">
-                      查看示例文章 1
-                    </Link>
-                    <Link href="/article/2" className="btn btn-secondary">
-                      查看示例文章 2
-                    </Link>
-                    <Link href="/stats/admin" className="btn btn-primary">
-                      访问统计管理
-                    </Link>
-                  </div>
-                </div>
-
-                {user ? (
-                  <div className={styles.userInfo}>
-                    <p>欢迎回来，{user.email}！</p>
-                    <p className={styles.email}>邮箱: {user.email}</p>
-                    <div className={styles.actions}>
-                      <Link href="/dashboard" className="btn btn-primary">
-                        进入仪表板
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.actions}>
-                    <Link href="/login" className="btn btn-primary">
-                      登录
-                    </Link>
-                    <Link href="/register" className="btn btn-secondary">
-                      注册
-                    </Link>
-                  </div>
-                )}
+            <div className="mx-auto max-w-3xl space-y-8">
+              <div className="space-y-2 text-center">
+                <h1 className="text-3xl font-bold tracking-tight">欢迎使用 JWT 认证系统</h1>
+                <p className="text-muted-foreground">这是一个基于 Next.js 和 JWT 的用户认证示例项目</p>
               </div>
+              <StatsDisplay />
+              <Card>
+                <CardHeader>
+                  <CardTitle>示例功能</CardTitle>
+                  <CardDescription>访问示例文章查看阅读量统计，或进入管理页面查看详细数据</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                  <Button variant="outline" asChild><Link href="/article/1">查看示例文章 1</Link></Button>
+                  <Button variant="outline" asChild><Link href="/article/2">查看示例文章 2</Link></Button>
+                  <Button asChild><Link href="/stats/admin">访问统计管理</Link></Button>
+                </CardContent>
+              </Card>
+              {user ? (
+                <Card>
+                  <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">欢迎回来，{user.email}</p>
+                      <p className="text-sm text-muted-foreground">邮箱: {user.email}</p>
+                    </div>
+                    <Button asChild><Link href="/dashboard">进入仪表板</Link></Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="flex justify-center gap-3">
+                  <Button asChild><Link href="/login">登录</Link></Button>
+                  <Button variant="outline" asChild><Link href="/register">注册</Link></Button>
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === 'dashboard' && (
-            <div className={styles.tabContent}>
-              <div className={styles.dashboardContent}>
+            <Card className="mx-auto max-w-2xl">
+              <CardContent className="p-6">
                 {user ? (
-                  <>
-                    <h1 className={styles.title}>欢迎回来，{user.email}！</h1>
-                    <div className={styles.userInfo}>
-                      <div className={styles.infoItem}>
-                        <span className={styles.label}>用户 ID:</span>
-                        <span className={styles.value}>{user.id}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <span className={styles.label}>邮箱:</span>
-                        <span className={styles.value}>{user.email}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <span className={styles.label}>账户状态:</span>
-                        <span className={styles.value}>
-                          {user.is_enabled ? '已启用' : '已禁用'}
-                        </span>
-                      </div>
-                      {user.last_login_at && (
-                        <div className={styles.infoItem}>
-                          <span className={styles.label}>最后登录时间:</span>
-                          <span className={styles.value}>
-                            {new Date(user.last_login_at).toLocaleString('zh-CN')}
-                          </span>
-                        </div>
-                      )}
-                      {user.created_at && (
-                        <div className={styles.infoItem}>
-                          <span className={styles.label}>注册时间:</span>
-                          <span className={styles.value}>
-                            {new Date(user.created_at).toLocaleString('zh-CN')}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.actions}>
-                      <Link href="/dashboard" className="btn btn-primary">
-                        查看完整仪表盘
-                      </Link>
-                    </div>
-                  </>
+                  <div className="space-y-4">
+                    <h1 className="text-2xl font-bold">欢迎回来，{user.email}</h1>
+                    <InfoRow label="用户 ID" value={user.id} />
+                    <InfoRow label="邮箱" value={user.email} />
+                    <InfoRow label="账户状态" value={user.is_enabled ? '已启用' : '已禁用'} />
+                    {user.last_login_at && (
+                      <InfoRow label="最后登录时间" value={new Date(user.last_login_at).toLocaleString('zh-CN')} />
+                    )}
+                    {user.created_at && (
+                      <InfoRow label="注册时间" value={new Date(user.created_at).toLocaleString('zh-CN')} />
+                    )}
+                    <Button asChild><Link href="/dashboard">查看完整仪表盘</Link></Button>
+                  </div>
                 ) : (
-                  <div className={styles.notLoggedIn}>
-                    <p>请先登录以查看仪表盘</p>
-                    <div className={styles.actions}>
-                      <Link href="/login" className="btn btn-primary">
-                        登录
-                      </Link>
-                      <Link href="/register" className="btn btn-secondary">
-                        注册
-                      </Link>
+                  <div className="space-y-4 text-center">
+                    <p className="text-muted-foreground">请先登录以查看仪表盘</p>
+                    <div className="flex justify-center gap-3">
+                      <Button asChild><Link href="/login">登录</Link></Button>
+                      <Button variant="outline" asChild><Link href="/register">注册</Link></Button>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
 
           {activeTab === 'openclaw' && (
-            <div className={styles.tabContent}>
-              <div className={styles.openclawContent}>
-                <h1 className={styles.title}>OpenClaw 会话</h1>
-                <p className={styles.description}>
-                  本页已连接 WS，作为控制端客户端。下列为已连接的 type=openclaw 客户端（每 8 秒刷新）。点击会话即向该客户端下发「会话选中」消息（消息中会附带所有 openclaw 客户端的 id 与设备/用户信息）。
+            <div className="mx-auto max-w-3xl space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold">OpenClaw 会话</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  本页已连接 WS，作为控制端客户端。点击会话即向该客户端下发「会话选中」消息。
                 </p>
-                <div className={styles.openclawToolbar}>
-                  <span className={styles.openclawCount}>当前 {openclawClients.length} 个会话</span>
-                  {openclawWsConnected && <span className={styles.openclawWsStatus}>控制端已连接 WS</span>}
-                  <button type="button" className={styles.openclawRefreshBtn} onClick={() => { setOpenclawLoading(true); fetchOpenclawClients(); }} disabled={openclawLoading}>
-                    {openclawLoading ? '刷新中…' : '刷新'}
-                  </button>
-                </div>
-                {openclawLoading && openclawClients.length === 0 && <div className={styles.loading}>加载中...</div>}
-                {openclawError && (
-                  <div className={styles.openclawError}>{openclawError}</div>
-                )}
-                {!openclawLoading && openclawClients.length === 0 && (
-                  <div className={styles.openclawEmpty}>
-                    暂无 OpenClaw 会话。
-                    <br />
-                    请用 <strong>npm run dev</strong> 启动服务（node server.js），然后运行 <strong>node test/test-openclaw-ws-webhook.js</strong>，连接后会在此列出（约 5 秒内可看到）。
-                  </div>
-                )}
-                {!openclawLoading && openclawClients.length > 0 && (
-                  <ul className={styles.openclawList}>
-                    {openclawClients.map((c) => (
-                      <li key={c.id} className={styles.openclawItem}>
-                        <button
-                          type="button"
-                          className={selectedOpenclawId === c.id ? styles.openclawItemActive : styles.openclawItemBtn}
-                          onClick={() => handleSelectOpenclawSession(c.id)}
-                        >
-                          <span className={styles.openclawItemId}>{c.id}</span>
-                          {c.deviceInfo && (
-                            <span className={styles.openclawItemDevice}>
-                              {[c.deviceInfo.systemType, c.deviceInfo.platform, c.deviceInfo.hostname, c.deviceInfo.username].filter(Boolean).join(' · ') || '未知设备'}
-                            </span>
-                          )}
-                          {selectedOpenclawId === c.id && <span className={styles.openclawItemBadge}>已选中</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {selectedOpenclawId && (
-                  <>
-                    <div className={styles.openclawHistory}>
-                      <div className={styles.openclawHistoryHeader}>
-                        <span className={styles.openclawHistoryTitle}>会话历史</span>
-                      </div>
-                      <div className={styles.openclawHistoryBody}>
-                        {(openclawHistory[selectedOpenclawId] || []).length === 0 && (
-                          <div className={styles.openclawHistoryEmpty}>暂无历史消息</div>
-                        )}
-                        {(openclawHistory[selectedOpenclawId] || []).map((msg: any, idx: number) => (
-                          <div key={idx} className={styles.openclawHistoryItem}>
-                            <div className={styles.openclawHistoryMeta}>
-                              <span className={styles.openclawHistoryTag}>{msg.status || msg.type || '消息'}</span>
-                              <span className={styles.openclawHistoryTime}>
-                                {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN') : ''}
-                              </span>
-                            </div>
-                            {msg.original_content && (
-                              <div className={styles.openclawHistoryOriginal}>
-                                <span className={styles.openclawHistoryLabel}>指令：</span>
-                                <span>{msg.original_content}</span>
-                              </div>
-                            )}
-                            {msg.response && (
-                              <pre className={styles.openclawHistoryResponse}>{msg.response}</pre>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  <div className={styles.openclawSend}>
-                    <input
-                      type="text"
-                      className={styles.openclawInput}
-                      placeholder="输入消息，将原样发送给选中的客户端…"
-                      value={openclawInput}
-                      onChange={(e) => setOpenclawInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendOpenclawMessage()}
-                      disabled={openclawSending}
-                    />
-                    <button
-                      type="button"
-                      className={styles.openclawSendBtn}
-                      onClick={handleSendOpenclawMessage}
-                      disabled={openclawSending || !openclawInput.trim()}
-                    >
-                      {openclawSending ? '发送中…' : '发送'}
-                    </button>
-                  </div>
-                  </>
-                )}
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="secondary">当前 {openclawClients.length} 个会话</Badge>
+                {openclawWsConnected && <Badge>控制端已连接 WS</Badge>}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setOpenclawLoading(true); fetchOpenclawClients(); }}
+                  disabled={openclawLoading}
+                >
+                  <RefreshCw className={cn('mr-1 h-3 w-3', openclawLoading && 'animate-spin')} />
+                  {openclawLoading ? '刷新中…' : '刷新'}
+                </Button>
+              </div>
+              {openclawLoading && openclawClients.length === 0 && <LoadingState />}
+              {openclawError && (
+                <Alert variant="destructive"><AlertDescription>{openclawError}</AlertDescription></Alert>
+              )}
+              {!openclawLoading && openclawClients.length === 0 && (
+                <Card>
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    暂无 OpenClaw 会话。请用 <strong>npm run dev</strong> 启动服务，然后运行{' '}
+                    <strong>node test/test-openclaw-ws-webhook.js</strong> 连接。
+                  </CardContent>
+                </Card>
+              )}
+              {openclawClients.length > 0 && (
+                <div className="grid gap-2">
+                  {openclawClients.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSelectOpenclawSession(c.id)}
+                      className={cn(
+                        'flex flex-col items-start rounded-lg border p-4 text-left transition-colors hover:bg-accent',
+                        selectedOpenclawId === c.id && 'border-primary bg-accent'
+                      )}
+                    >
+                      <span className="font-mono text-sm">{c.id}</span>
+                      {c.deviceInfo && (
+                        <span className="mt-1 text-xs text-muted-foreground">
+                          {[c.deviceInfo.systemType, c.deviceInfo.platform, c.deviceInfo.hostname, c.deviceInfo.username].filter(Boolean).join(' · ') || '未知设备'}
+                        </span>
+                      )}
+                      {selectedOpenclawId === c.id && <Badge className="mt-2">已选中</Badge>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedOpenclawId && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">会话历史</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(openclawHistory[selectedOpenclawId] || []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">暂无历史消息</p>
+                    ) : (
+                      (openclawHistory[selectedOpenclawId] || []).map((msg: any, idx: number) => (
+                        <div key={idx} className="rounded-lg border p-3 text-sm">
+                          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <Badge variant="outline">{msg.status || msg.type || '消息'}</Badge>
+                            <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN') : ''}</span>
+                          </div>
+                          {msg.original_content && (
+                            <p><span className="text-muted-foreground">指令：</span>{msg.original_content}</p>
+                          )}
+                          {msg.response && (
+                            <pre className="mt-2 overflow-auto rounded bg-muted p-2 text-xs">{msg.response}</pre>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    <div className="flex gap-2 pt-2">
+                      <Input
+                        placeholder="输入消息，将原样发送给选中的客户端…"
+                        value={openclawInput}
+                        onChange={(e) => setOpenclawInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendOpenclawMessage()}
+                        disabled={openclawSending}
+                      />
+                      <Button onClick={handleSendOpenclawMessage} disabled={openclawSending || !openclawInput.trim()}>
+                        {openclawSending ? '发送中…' : '发送'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 
-          {activeTab === 'gemini' && (
-            <div className={styles.tabContent}>
-              <GeminiChat />
-            </div>
-          )}
-        </main>
-      </div>
+          {activeTab === 'gemini' && <GeminiChat />}
+        </PageContainer>
+      </AppShell>
     </>
   );
 }

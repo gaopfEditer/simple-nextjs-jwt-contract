@@ -1,10 +1,13 @@
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useTrackArticleView } from '@/lib/use-stats';
 import ArticleStats from '@/components/ArticleStats';
-import styles from '@/styles/Article.module.css';
+import { AppNavbar, PageContainer } from '@/components/layout/AppShell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
-// 示例文章内容
 const articles: Record<string, { title: string; content: string }> = {
   '1': {
     title: '如何实现访问统计功能',
@@ -39,22 +42,24 @@ export default function ArticlePage() {
   const router = useRouter();
   const { id } = router.query;
   const articleId = id as string;
-
-  // 自动跟踪文章阅读
   useTrackArticleView(articleId);
-
   const article = articleId ? articles[articleId] : null;
 
   if (!articleId || !article) {
     return (
-      <div className={styles.container}>
-        <Head>
-          <title>文章不存在</title>
-        </Head>
-        <main className={styles.main}>
-          <h1>文章不存在</h1>
-          <p>请检查文章ID是否正确。</p>
-        </main>
+      <div className="min-h-screen bg-background">
+        <AppNavbar />
+        <PageContainer>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <h1 className="text-2xl font-bold">文章不存在</h1>
+              <p className="mt-2 text-muted-foreground">请检查文章 ID 是否正确。</p>
+              <Button className="mt-4" asChild>
+                <Link href="/">返回首页</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </PageContainer>
       </div>
     );
   }
@@ -65,25 +70,26 @@ export default function ArticlePage() {
         <title>{article.title}</title>
         <meta name="description" content={article.content.substring(0, 150)} />
       </Head>
-      <div className={styles.container}>
-        <main className={styles.main}>
-          <article className={styles.article}>
-            <h1 className={styles.title}>{article.title}</h1>
-            
-            {/* 显示文章阅读量统计 */}
-            <ArticleStats articleId={articleId} />
-            
-            <div className={styles.content}>
-              {article.content.split('\n').map((paragraph, index) => (
-                paragraph.trim() && (
-                  <p key={index}>{paragraph.trim()}</p>
-                )
-              ))}
+      <div className="min-h-screen bg-background">
+        <AppNavbar />
+        <PageContainer className="max-w-3xl">
+          <Button variant="ghost" size="sm" className="mb-4" asChild>
+            <Link href="/">← 返回首页</Link>
+          </Button>
+          <article>
+            <h1 className="text-4xl font-bold tracking-tight">{article.title}</h1>
+            <div className="mt-4">
+              <ArticleStats articleId={articleId} />
+            </div>
+            <Separator className="my-8" />
+            <div className="prose prose-neutral max-w-none space-y-4 text-muted-foreground">
+              {article.content.split('\n').map((paragraph, index) =>
+                paragraph.trim() ? <p key={index}>{paragraph.trim()}</p> : null
+              )}
             </div>
           </article>
-        </main>
+        </PageContainer>
       </div>
     </>
   );
 }
-

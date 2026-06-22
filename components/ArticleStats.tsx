@@ -1,6 +1,8 @@
 import React from 'react';
 import { useArticleStats } from '@/lib/use-stats';
-import styles from '@/styles/StatsDisplay.module.css';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ArticleStatsProps {
   articleId: string;
@@ -11,23 +13,15 @@ export default function ArticleStats({ articleId, className }: ArticleStatsProps
   const { stats, loading, error } = useArticleStats(articleId);
 
   if (loading) {
-    return (
-      <div className={`${styles.articleStats} ${className || ''}`}>
-        <span className={styles.loading}>加载中...</span>
-      </div>
-    );
+    return <Skeleton className={cn('h-6 w-40', className)} />;
   }
 
-  if (error || !stats) {
-    return null;
-  }
+  if (error || !stats) return null;
 
   return (
-    <div className={`${styles.articleStats} ${className || ''}`}>
-      <span className={styles.articleStatLabel}>本文总阅读量</span>
-      <span className={styles.articleStatValue}>{stats.views.toLocaleString()}</span>
-      <span className={styles.articleStatUnit}>次</span>
+    <div className={cn('flex items-center gap-2', className)}>
+      <span className="text-sm text-muted-foreground">本文总阅读量</span>
+      <Badge variant="secondary">{stats.views.toLocaleString()} 次</Badge>
     </div>
   );
 }
-

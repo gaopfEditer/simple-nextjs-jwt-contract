@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import styles from '../styles/ChatBox.module.css';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 interface Message {
   id: number;
@@ -300,13 +304,8 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
     return new Date(timestamp).toLocaleString('zh-CN');
   };
 
-  // 获取消息类型显示样式
-  const getMessageTypeStyle = (msg: Message) => {
-    if (msg.source === 'tradingview' || msg.type === 'trading_signal') {
-      return styles.tradingSignal;
-    }
-    return '';
-  };
+  const isTradingSignal = (msg: Message) =>
+    msg.source === 'tradingview' || msg.type === 'trading_signal';
 
   // 渲染TradingView交易信号的特殊显示
   const renderTradingViewMessage = (msg: Message) => {
@@ -320,96 +319,75 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
     const time = metadata.time;
 
     return (
-      <div className={styles.tradingViewInfo}>
-        <div className={styles.tickerBadge}>
-          <span className={styles.tickerLabel}>交易对:</span>
-          <span className={styles.tickerValue}>{ticker}</span>
-        </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Badge variant="secondary">交易对: {ticker}</Badge>
         {close !== null && close !== undefined && (
-          <div className={styles.priceBadge}>
-            <span className={styles.priceLabel}>价格:</span>
-            <span className={styles.priceValue}>{close.toLocaleString()}</span>
-          </div>
+          <Badge variant="outline">价格: {close.toLocaleString()}</Badge>
         )}
         {time && (
-          <div className={styles.timeBadge}>
-            <span className={styles.timeLabel}>时间:</span>
-            <span className={styles.timeValue}>{new Date(time).toLocaleString('zh-CN')}</span>
-          </div>
+          <Badge variant="outline">时间: {new Date(time).toLocaleString('zh-CN')}</Badge>
         )}
       </div>
     );
   };
 
   return (
-    <div className={styles.chatContainer}>
-      <div className={styles.chatHeader}>
-        <h2>{title}</h2>
-        <div className={styles.status}>
-          <span className={`${styles.statusIndicator} ${isConnected ? styles.connected : styles.disconnected}`}>
-            {isConnected ? '●' : '○'}
-          </span>
+    <Card className="flex h-[calc(100vh-10rem)] flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-4">
+        <CardTitle className="text-lg">{title}</CardTitle>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-muted-foreground/40')} />
           <span>{connectionStatus}</span>
-          {messages.length > 0 && (
-            <span className={styles.messageCount}>({messages.length})</span>
-          )}
+          {messages.length > 0 && <Badge variant="secondary">{messages.length}</Badge>}
         </div>
-      </div>
-      
-      <div 
-        className={styles.messagesContainer}
-        onScroll={handleScroll}
-      >
-        {messages.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>暂无消息</p>
-            <p className={styles.emptyHint}>等待接收消息...</p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`${styles.messageItem} ${getMessageTypeStyle(msg)}`}>
-              <div className={styles.messageHeader}>
-                <span className={styles.messageSource}>
-                  {getSourceName(msg.source)}
-                </span>
-                {msg.sender && (
-                  <span className={styles.messageSender}>
-                    @{msg.sender}
-                  </span>
-                )}
-                <span className={styles.messageTime}>
-                  {formatTime(msg.created_at)}
-                </span>
+      </CardHeader>
+
+      <div className="flex-1 overflow-y-auto px-4" onScroll={handleScroll}>
+          <div className="space-y-3 py-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+                <p className="text-sm font-medium">暂无消息</p>
+                <p className="mt-1 text-xs">等待接收消息...</p>
               </div>
-              {msg.title && (
-                <div className={styles.messageTitle}>
-                  {msg.title}
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    'rounded-lg border bg-card p-4 text-card-foreground shadow-sm',
+                    isTradingSignal(msg) && 'border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20'
+                  )}
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{getSourceName(msg.source)}</Badge>
+                    {msg.sender && <span>@{msg.sender}</span>}
+                    <span className="ml-auto">{formatTime(msg.created_at)}</span>
+                  </div>
+                  {msg.title && <p className="mb-2 font-semibold">{msg.title}</p>}
+                  {renderTradingViewMessage(msg)}
+                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                  {msg.metadata && Object.keys(msg.metadata).length > 0 && (
+                    <details className="mt-2 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer">详细信息</summary>
+                      <pre className="mt-2 overflow-auto rounded-md bg-muted p-2">{JSON.stringify(msg.metadata, null, 2)}</pre>
+                    </details>
+                  )}
+                  <Separator className="my-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>ID: {msg.id}</span>
+                    <span>{formatFullTime(msg.created_at)}</span>
+                  </div>
                 </div>
-              )}
-              {/* TradingView交易信号特殊显示 */}
-              {renderTradingViewMessage(msg)}
-              <div className={styles.messageContent}>
-                {msg.content}
-              </div>
-              {msg.metadata && Object.keys(msg.metadata).length > 0 && (
-                <details className={styles.messageMetadata}>
-                  <summary>详细信息</summary>
-                  <pre>{JSON.stringify(msg.metadata, null, 2)}</pre>
-                </details>
-              )}
-              <div className={styles.messageFooter}>
-                <span className={styles.messageId}>ID: {msg.id}</span>
-                <span className={styles.messageFullTime}>{formatFullTime(msg.created_at)}</span>
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
       </div>
 
-      <div className={styles.chatFooter}>
-        <button
-          className={styles.scrollToBottomBtn}
+      <CardContent className="flex gap-2 border-t pt-4">
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => {
             autoScrollRef.current = true;
             scrollToBottom();
@@ -417,10 +395,11 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
           disabled={messages.length === 0}
         >
           滚动到底部
-        </button>
+        </Button>
         {messages.length > 0 && (
-          <button
-            className={styles.clearBtn}
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               if (confirm('确定要清空所有消息吗？')) {
                 setMessages([]);
@@ -428,10 +407,10 @@ export default function ChatBox({ filterSource = null, title = '消息中心' }:
             }}
           >
             清空消息
-          </button>
+          </Button>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 

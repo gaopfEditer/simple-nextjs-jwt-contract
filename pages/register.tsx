@@ -4,7 +4,11 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { register } from '@/lib/api';
 import { setToken } from '@/lib/auth';
-import styles from '../styles/Auth.module.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,44 +40,57 @@ export default function RegisterPage() {
         <meta name="description" content="用户注册页面" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <div className={styles.container}>
-        <div className={styles.authBox}>
-          <h1 className={styles.title}>注册</h1>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="email">邮箱</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="请输入邮箱"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="password">密码</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="请输入密码（至少 6 位）"
-                minLength={6}
-              />
-            </div>
-            {error && <div className="error-message">{error}</div>}
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? '注册中...' : '注册'}
-            </button>
-          </form>
-          <p className={styles.footer}>
-            已有账号？<Link href="/login">立即登录</Link>
-          </p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl">注册</CardTitle>
+            <CardDescription>创建新账户以开始使用</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">邮箱</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="name@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">密码</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="至少 6 位密码"
+                  minLength={6}
+                />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? '注册中...' : '注册'}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <p className="text-sm text-muted-foreground">
+              已有账号？{' '}
+              <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
+                立即登录
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
       </div>
     </>
   );
 }
-
