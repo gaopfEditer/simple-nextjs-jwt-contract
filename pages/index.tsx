@@ -5,7 +5,7 @@ import ChatBox from '@/components/ChatBox';
 import { getCurrentUser } from '@/lib/api';
 import StatsDisplay from '@/components/StatsDisplay';
 import GeminiChat from '@/components/GeminiChat';
-import { AppShell, AppTabs, PageContainer, InfoRow, LoadingState } from '@/components/layout/AppShell';
+import { DashboardShell, PageHeader, InfoRow, LoadingState } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -241,19 +241,21 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <AppShell user={user}>
-        <AppTabs tabs={tabs} activeTab={activeTab} onTabChange={(v) => setActiveTab(v as TabType)} />
-
-        <PageContainer>
+      <DashboardShell
+        user={user}
+        sidebarItems={tabs}
+        activeTab={activeTab}
+        onTabChange={(v) => setActiveTab(v as TabType)}
+      >
           {activeTab === 'chat' && <ChatBox filterSource="exclude_tradingview" title="聊天室" />}
           {activeTab === 'signals' && <ChatBox filterSource="tradingview" title="信号列表" />}
 
           {activeTab === 'home' && (
             <div className="mx-auto max-w-3xl space-y-8">
-              <div className="space-y-2 text-center">
-                <h1 className="text-3xl font-bold tracking-tight">欢迎使用 JWT 认证系统</h1>
-                <p className="text-muted-foreground">这是一个基于 Next.js 和 JWT 的用户认证示例项目</p>
-              </div>
+              <PageHeader
+                title="欢迎使用 JWT 认证系统"
+                description="基于 Next.js + JWT 的认证与实时消息平台，界面采用 shadcn/ui 设计体系。"
+              />
               <StatsDisplay />
               <Card>
                 <CardHeader>
@@ -317,12 +319,10 @@ export default function Home() {
 
           {activeTab === 'openclaw' && (
             <div className="mx-auto max-w-3xl space-y-6">
-              <div>
-                <h1 className="text-2xl font-bold">OpenClaw 会话</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  本页已连接 WS，作为控制端客户端。点击会话即向该客户端下发「会话选中」消息。
-                </p>
-              </div>
+              <PageHeader
+                title="OpenClaw 会话"
+                description="本页已连接 WS 作为控制端。点击会话下发「会话选中」消息，并查看历史回复。"
+              />
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant="secondary">当前 {openclawClients.length} 个会话</Badge>
                 {openclawWsConnected && <Badge>控制端已连接 WS</Badge>}
@@ -414,8 +414,7 @@ export default function Home() {
           )}
 
           {activeTab === 'gemini' && <GeminiChat />}
-        </PageContainer>
-      </AppShell>
+      </DashboardShell>
     </>
   );
 }

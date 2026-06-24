@@ -6,10 +6,7 @@ import '../styles/globals.css';
 
 function AppContent({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  
-  // 自动跟踪页面访问
   useTrackVisit(router.asPath);
-
   return <Component {...pageProps} />;
 }
 
