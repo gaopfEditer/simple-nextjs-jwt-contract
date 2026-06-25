@@ -15,6 +15,10 @@ const mysql = require('mysql2/promise');
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
+// Windows 上 listen('localhost') 可能只绑 [::1]，导致 127.0.0.1 连接 ECONNREFUSED
+const listenHost =
+  process.env.LISTEN_HOST ||
+  (hostname === 'localhost' || hostname === '127.0.0.1' ? '0.0.0.0' : hostname);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -71,14 +75,14 @@ function getDbPool() {
 app.prepare().then(() => {
   console.log('> Next.js 应用已准备就绪');
   console.log('> API 路由已加载，可以接收请求');
-  console.log(`> 准备启动服务器，端口: ${port}, 主机: ${hostname}`);
+  console.log(`> 准备启动服务器，端口: ${port}, 监听: ${listenHost} (访问可用 localhost / 127.0.0.1)`);
   
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
       const pathname = (parsedUrl.pathname || '').replace(/\/$/, '') || '/';
-      if (pathname.indexOf('openclaw') !== -1) {
-        console.log('[OpenClaw] 请求到达 server.js:', req.method, pathname);
+      if (pathname.indexOf('openclaw') !== -1 || pathname.indexOf('deal-video') !== -1) {
+        console.log('[WS路由] 请求到达 server.js:', req.method, pathname);
       }
       
       // Next.js 热更新相关路径，直接交给 Next.js 处理
@@ -307,6 +311,97 @@ app.prepare().then(() => {
             res.end(JSON.stringify({ success: false, error: e.message }));
           }
         });
+        return;
+      }
+
+      // Deal-Video 公开 API：接收 videoUrl 并立即 WS 通知 type=deal-video 客户端
+      if (pathname === '/api/deal-video/receive' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            const q = parsedUrl.query || {};
+            const videoUrl =
+              data.videoUrl || data.video_url || data.url ||
+              (typeof q.videoUrl === 'string' ? q.videoUrl : null);
+            if (!videoUrl || typeof videoUrl !== 'string' || !videoUrl.trim()) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: '缺少 videoUrl' }));
+              return;
+            }
+            const forwardedCount = await forwardToDealVideoClients(videoUrl.trim(), {
+              type: 'deal-video',
+              meta: data.meta ?? null,
+            });
+            console.log(`[DealVideo] POST /receive videoUrl="${videoUrl.trim()}" -> ${forwardedCount} 个客户端`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: '视频任务已转发给 deal-video 客户端',
+              data: { videoUrl: videoUrl.trim(), forwardedCount },
+            }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON', message: e.message }));
+          }
+        });
+        return;
+      }
+
+      // Deal-Video：将视频 URL 转发给 type=deal-video 的 WebSocket 客户端（内部）
+      if (pathname === '/api/deal-video/forward' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            const videoUrl = data.videoUrl || data.video_url || data.url;
+            const targetType = data.type || 'deal-video';
+            if (!videoUrl || typeof videoUrl !== 'string') {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: '缺少 videoUrl' }));
+              return;
+            }
+            const forwardedCount = await forwardToDealVideoClients(videoUrl.trim(), {
+              type: targetType,
+              meta: data.meta || null,
+            });
+            console.log(`[DealVideo转发] videoUrl 已发送给 ${forwardedCount} 个 type=${targetType} 的客户端`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: '已转发给 deal-video 客户端',
+              videoUrl: videoUrl.trim(),
+              forwardedCount,
+            }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON', message: e.message }));
+          }
+        });
+        return;
+      }
+
+      // 获取 deal-video 会话列表
+      if (req.method === 'GET' && (pathname === '/api/deal-video/clients' || pathname.startsWith('/api/deal-video/clients?'))) {
+        try {
+          const list = [];
+          for (const [ws, info] of clients.entries()) {
+            if (info.clientType === 'deal-video' && ws.readyState === WebSocket.OPEN) {
+              list.push({
+                id: info.id,
+                clientType: info.clientType || 'deal-video',
+                deviceInfo: info.deviceInfo || null,
+              });
+            }
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, clients: list }));
+        } catch (e) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, clients: [] }));
+        }
         return;
       }
       
@@ -930,6 +1025,32 @@ app.prepare().then(() => {
     return count;
   }
 
+  // 转发视频 URL 到 type=deal-video 的 WebSocket 客户端
+  async function forwardToDealVideoClients(videoUrl, extra = {}) {
+    const messageData = {
+      type: 'deal_video_task',
+      videoUrl,
+      clientType: 'deal-video',
+      meta: extra.meta ?? null,
+      timestamp: new Date().toISOString(),
+    };
+    const messageJson = JSON.stringify(messageData);
+    let count = 0;
+    const targetType = extra.type || 'deal-video';
+    clients.forEach((clientInfo, ws) => {
+      if (clientInfo.clientType === targetType && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(messageJson);
+          count++;
+          console.log(`[DealVideo转发] 已发送 videoUrl 到客户端 ${clientInfo.id}`);
+        } catch (err) {
+          console.error(`[DealVideo转发] 发送失败 (${clientInfo.id}):`, err);
+        }
+      }
+    });
+    return count;
+  }
+
   // 转发消息到所有WebSocket客户端
   async function forwardMessageToClients(message) {
     try {
@@ -1187,12 +1308,13 @@ app.prepare().then(() => {
       }
       process.exit(1);
     })
-    .listen(port, hostname, async () => {
-      console.log(`> ✅ 服务器已启动: http://${hostname}:${port}`);
-      console.log(`> ✅ WebSocket 服务器已启动: ws://${hostname}:${port}/api/ws`);
-      console.log(`> ✅ 消息API: http://${hostname}:${port}/api/messages/receive`);
-      console.log(`> ✅ TradingView API: http://${hostname}:${port}/api/tradingview/receive`);
-      console.log(`> ✅ OpenClaw Webhook: http://${hostname}:${port}/api/openclaw/webhook`);
+    .listen(port, listenHost, async () => {
+      console.log(`> ✅ 服务器已启动: http://127.0.0.1:${port}  (亦可用 http://localhost:${port})`);
+      console.log(`> ✅ WebSocket: ws://127.0.0.1:${port}/api/ws?type=deal-video`);
+      console.log(`> ✅ Deal-Video API: http://127.0.0.1:${port}/api/deal-video/receive`);
+      console.log(`> ✅ 消息API: http://127.0.0.1:${port}/api/messages/receive`);
+      console.log(`> ✅ TradingView API: http://127.0.0.1:${port}/api/tradingview/receive`);
+      console.log(`> ✅ OpenClaw Webhook: http://127.0.0.1:${port}/api/openclaw/webhook`);
       console.log(`> ✅ 服务器正在监听端口 ${port}，等待请求...`);
       
       // 服务器启动后初始化数据库连接池
